@@ -17,5 +17,15 @@ Imports:
     tibble,
     tidyr
 Suggests: 
-    testthat (>= 3.0.0)
+    GenomicRanges,
+    knitr,
+    rmarkdown,
+    RMTstat,
+    RNOmni,
+    testthat (>= 3.0.0),
+    tidyverse
 Config/testthat/edition: 3
+VignetteBuilder: knitr
+Depends: 
+    R (>= 2.10)
+LazyData: true
