@@ -18,7 +18,9 @@ Imports:
     tidyr
 Suggests: 
     GenomicRanges,
+    IlluminaHumanMethylation450kanno.ilmn12.hg19,
     knitr,
+    liftOver,
     rmarkdown,
     RMTstat,
     RNOmni,

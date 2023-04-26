@@ -2,7 +2,6 @@
 output: github_document
 ---
 
-<!-- README.md is generated from README.Rmd. Please edit that file -->
 
 ```{r, include = FALSE}
 knitr::opts_chunk$set(
@@ -16,21 +15,33 @@ knitr::opts_chunk$set(
 
 # regionalpcs
 
-<!-- badges: start -->
-<!-- badges: end -->
+The goal of *regionalpcs* is to provide functions to easily summarize DNA methylation data on a regional level using regional principal components (rPCs). The rPCs help to capture more biologically-relevant signals for downstream analyses.
 
-The goal of regionalpcs is to provide functions to easily summarize DNA methylation data on a regional level using regional principal components (rPCs). The rPCs help to capture more biologically-relevant signal for downstream analyses.
 
 ## Installation
 
 You can install the development version of regionalpcs from [GitHub](https://github.com/) with:
 
-``` r
+```r
+# install devtool package if needed
 # install.packages("devtools")
+
+# download the regionalpcs package
 devtools::install_github("tyeulalio/regionalpcs")
 ```
 
 # `regionalpcs` R Package Tutorial 
+
+#### Table of Contents
+- [`regionalpcs` R Package Tutorial](#-regionalpcs--r-package-tutorial)
+  * [Loading packages](#loading-packages)
+  * [Loading in a dataset](#loading-in-a-dataset)
+  * [Getting methylation array probe positions](#getting-methylation-array-probe-positions)
+  * [Process and filter the methylation data.](#process-and-filter-the-methylation-data)
+  * [Summarizing gene region types](#summarizing-gene-region-types)
+    + [Loading gene region annotations](#loading-gene-region-annotations)
+    + [Creating a region map](#creating-a-region-map)
+    + [Summarize gene regions](#summarize-gene-regions)
 
 ## Loading packages
 To begin working with the *regionalpcs* R package, we need to first load it into our R session along with some other necessary packages. We can do this using the **`library()`** function in R. Here's an example code snippet to load the required packages:
@@ -39,6 +50,8 @@ To begin working with the *regionalpcs* R package, we need to first load it into
 library(regionalpcs)
 library(RNOmni)
 library(GenomicRanges)
+library(IlluminaHumanMethylation450kanno.ilmn12.hg19)
+library(liftOver)
 library(tidyverse)
 ```
 
@@ -53,9 +66,7 @@ Once the packages are loaded, we can start using the functions provided by each 
 
 In this section, we'll load a methylation dataset collected from TCGA using 450k methylation arrays. Before we can start any analysis, we need to load in the data and take a look at what we're working with.
 
-The **`betas`** dataset included with the `regionalpcs` package contains methylation values for 1,000 methylation sites and 300 individuals. We've subset the original dataset to save space and compute time for this vignette. To work well for downstream statistical analyses, we'll need to normalize the beta values by removing low variance CpGs and applying the inverse normal transform.
-
-**remove NA values from the actual dataset - this dataset needs to be preprocessed**
+The **`betas`** dataset included with the `regionalpcs` package contains methylation values for 293 methylation sites and 300 individuals. We've subset the original dataset to save space and compute time for this vignette. To work well for downstream statistical analyses, we'll need to normalize the beta values by removing low variance CpGs and applying the inverse normal transform.
 
 
 ```{r view_data}
@@ -63,11 +74,82 @@ head(betas)[1:3]
 dim(betas)
 ```
 
-**add something about getting positions from cpg id's**
-
 We can see that the row names contain CpG IDs and positions, while the columns contain methylation beta values, which range from 0 to 1.
 
-Before we can start analyzing the data, we need to preprocess it. This includes removing any missing values and normalizing the beta values. We'll cover these steps in more detail later in the tutorial.
+## Getting methylation array probe positions
+
+In methylation array data, we may have only the probe ID without a position. To obtain the probe position, we can use Illumina annotations for the 450k methylation arrays found in the *IlluminaHumanMethylation450kanno.ilmn12.hg19* R package. In this example, we will extract the probe names from our betas data frame and separate the probe name from the CpG position using regex to find the last underscore.
+
+```{r}
+# get the probe names from the betas data frame
+cpg_df <- data.frame(cpgs=rownames(betas)) %>%
+  # separate the probe name from the cpg position using regex to find the last underscore
+  separate(cpgs, into=c('cpg_pos', 'probe'), sep= "_(?=[^_]+$)", extra='merge')
+head(cpg_df)
+
+# load the Illumina 450k array probe positions
+data(Locations)
+probe_positions=data.frame(Locations)
+head(probe_positions)
+
+# attach probe positions to our cpg data frame
+# format the data frame first
+formatted_probe_positions <- probe_positions %>%
+  rownames_to_column('probe')
+head(formatted_probe_positions)
+
+# now attach the data frames
+new_cpg_df <- cpg_df %>%
+  left_join(formatted_probe_positions, by='probe')
+head(new_cpg_df)
+
+```
+
+In the above code, we first obtain the probe names from the betas data frame and then use regular expressions to separate the probe name from the CpG position. Next, we load the Illumina 450k array probe positions and attach them to our *new_cpg_df* data frame.
+
+However, note that the `pos` column from the *Locations* data frame does not match the positions in our `cpg_pos` column. This is because the genomic builds do not match. The *IlluminaHumanMethylation450kanno.ilmn12.hg19* annotations are in the hg19 build, and we are working with hg38 genomic annotations for this analysis. To convert hg19 positions to hg38, we use the *GenomicRanges* and *liftOver* packages. Here's a quick example on how to lift over positions from one build to another. Always ensure that you are working with the correct genome build and that the build matches across all your datasets, or else you will run into big issues!
+
+We need a chain file to lift the genomic positions. The chain file is an annotation file that links the positions between the genome builds. You can download this file from the (UCSC golden path download site)[https://hgdownload.cse.ucsc.edu/goldenpath/hg19/liftOver/]. Be sure to download the file that maps between the appropriate builds. We'll be mapping from hg19 to hg38. We've included the chain used in this analysis as a part of the regionalpcs package, which can be accessed in the "extdata" folder as shown in the code below.
+
+```{r}
+# convert hg19 positions into a genomic ranges object
+
+# genomic ranges expects a start and end position so let's add this
+hg19_pos <- new_cpg_df %>%
+  # select the hg19 positions from the data frame we created
+  select('chr', 'pos', 'strand', 'probe') %>%
+  # create a start/end column
+  mutate(start = pos,
+         end = as.numeric(pos)+1)
+head(hg19_pos)
+
+# now create the genomic ranges object
+hg19_pos_gr <- makeGRangesFromDataFrame(hg19_pos, keep.extra.columns = TRUE)
+hg19_pos_gr
+
+# now use liftOver to convert positions to hg38
+# load the chain file
+chain_file <- system.file("extdata", "hg19toHg38.over.chain", package="regionalpcs")
+chain <- import.chain(chain_file)
+
+# liftover
+hg38_pos <- liftOver(hg19_pos_gr, chain) %>%
+  as.data.frame()
+head(hg38_pos)
+
+# let's rename the columns and connect it back with our cpg annotations
+formatted_hg38 <- hg38_pos %>%
+  select(chrom_hg38 = seqnames, pos_hg38=start, probe)
+head(formatted_hg38)
+
+lifted_cpg_df <- new_cpg_df %>%
+  left_join(formatted_hg38, by='probe')
+head(lifted_cpg_df)
+
+```
+
+With probe positions and genome builds sorted out, we can move on to preprocessing the methylation array data. This usually involves filtering probes with low variability, removing any missing values, and normalizing the beta values. In addition, we may want to perform batch correction or adjust for other sources of technical or biological variation. We'll cover these steps in more detail later in the tutorial. It's important to ensure that our preprocessing steps are appropriate for our research question and dataset, as they can affect downstream analyses and interpretations.
+
 
 ## Process and filter the methylation data.
 
@@ -79,7 +161,7 @@ var_betas <- betas[apply(betas, 1, var, na.rm=TRUE) != 0,] %>%
   na.omit()
 dim(var_betas)
 ```
-We'll be lenient here and only remove CpGs that have zero variance. However, we can come back and change this threshold later if needed.
+We are being lenient here and only remove CpGs that have zero variance. However, we can come back and change this threshold later if needed.
 
 Now, let's normalize our methylation values to deal with the heteroscedasticity present in methylation data. We'll apply the inverse normal transform using functions from the **`RNOmni`** package by applying the **`RankNorm`** function to each row of our data frame.
 
@@ -95,7 +177,7 @@ With our filtered and normalized data, we can now summarize region types using t
 ## Summarizing gene region types
 
 ### Loading gene region annotations
-We'll start by loading gene region annotations. Make sure that these annotations are using the same genomic reference build (GrCh37, GrCh38) as your CpG annotations.
+We'll start by loading gene region annotations. Make sure that these annotations are using the same genomic reference build (GrCh37, GrCh38) as your CpG annotations. **All annotations included with the *regionalpcs* package are in build hg38.**
 
 ```{r}
 #  load gene region annotation file
