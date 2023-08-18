@@ -21,7 +21,7 @@ devtools::install_github("tyeulalio/regionalpcs")
 
 # `regionalpcs` R Package Tutorial
 
-## Table of Contents
+#### Table of Contents
 
 - [`regionalpcs` R Package Tutorial](#-regionalpcs--r-package-tutorial)
   - [Loading packages](#loading-packages)

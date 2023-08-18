@@ -7,6 +7,7 @@
 #'
 #' @return list containing PC results
 #' @importFrom magrittr %>%
+#' @importFrom rlang .data
 #' @export
 #'
 #' @examples
@@ -48,7 +49,7 @@ compute_regional_pcs <- function(meth, region_map, pc_method='gd', verbose=FALSE
       t() %>%
       as.data.frame() %>%
       tibble::rownames_to_column('pc') %>%
-      dplyr::mutate(pc = paste(res$region, pc, sep='-')) %>%
+      dplyr::mutate(pc = paste(res$region, .data$pc, sep='-')) %>%
       tibble::column_to_rownames('pc')
   }
 
@@ -93,7 +94,7 @@ summarize_region <- function(region, region_map, meth, pc_method, verbose){
 
   # summarize each region
   region_cpgs <- region_map %>%
-    dplyr::filter(region_id == region)
+    dplyr::filter(.data$region_id == region)
 
   # subset methylation to the cpgs in the region
   region_meth <- as.data.frame(meth)[region_cpgs$cpg_id,,drop=FALSE]
