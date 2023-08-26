@@ -2,22 +2,41 @@
 % Please edit documentation in R/compute_regional_pcs.R
 \name{compute_regional_pcs}
 \alias{compute_regional_pcs}
-\title{Compute regional PCs using methylation data for all regions included in the region map}
+\title{Compute regional principal components for methylation data}
 \usage{
 compute_regional_pcs(meth, region_map, pc_method = "gd", verbose = FALSE)
 }
 \arguments{
-\item{meth}{Data frame or matrix of methylation values to summarize; rows=CpGs, columns=samples}
+\item{meth}{Data frame of methylation beta values,
+with CpGs in rows and samples in columns}
 
-\item{region_map}{Mapping of CpGs to regions, column 1 should be regions, column 2 should be CpGs with the same names as the rows of meth}
+\item{region_map}{Data frame mapping CpGs to gene regions}
 
-\item{pc_method}{String indicating the method for estimating dimension; "gd"=Gavish-Donoho (default), "mp"=Marchenko-Pastur}
+\item{pc_method}{Method to use for PC computation,
+either 'gd' (Gavish-Donoho) or 'mp' (Marchenko-Pastur)}
 
-\item{verbose}{Boolean; print output statements}
+\item{verbose}{Logical, should progress messages be displayed?}
 }
 \value{
-list containing PC results
+A list containing several elements,
+including the regional PCs, percent variance, and other information
 }
 \description{
-Compute regional PCs using methylation data for all regions included in the region map
+Compute regional principal components for methylation data
+}
+\examples{
+# Create synthetic methylation data
+meth_data <- matrix(rnorm(1000), nrow = 100, ncol = 10)
+rownames(meth_data) <- paste0("CpG", 1:100)
+colnames(meth_data) <- paste0("Sample", 1:10)
+
+# Create a synthetic region map
+region_map_data <- data.frame(
+    region_id = rep(c("Gene1", "Gene2"), each = 50),
+    cpg_id = rownames(meth_data)
+)
+
+# Run the function
+compute_regional_pcs(meth_data, region_map_data, pc_method = 'gd')
+
 }

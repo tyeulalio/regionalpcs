@@ -4,7 +4,7 @@
 The goal of *regionalpcs* is to provide functions to easily summarize
 DNA methylation data on a regional level using regional principal
 components (rPCs). The rPCs help to capture more biologically-relevant
-signals for downstream analyses.
+signals for downstream analyses..
 
 ## Installation
 

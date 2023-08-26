@@ -3,27 +3,32 @@
 \docType{data}
 \name{betas}
 \alias{betas}
-\title{Sample methylation data in betas format}
+\title{Sample Methylation Data in Betas Format}
 \format{
-\subsection{\code{betas}}{
-
-A data frame with 293 rows and 300 columns:
-\describe{
-\item{rows}{Illumina methylation array probes}
-\item{columns}{TCGA-BRCA samples}
-...
-}
-}
+An object of class \code{data.frame} with 293 rows and 300 columns.
 }
 \source{
 \url{https://portal.gdc.cancer.gov/projects/TCGA-BRCA}
 }
 \usage{
-betas
+data("betas")
+}
+\value{
+A data frame with 293 rows and 300 columns, where each column
+corresponds to a TCGA-BRCA sample and each row corresponds to an Illumina
+methylation array probe.
 }
 \description{
 A subset of methylation data from The Cancer Genome Atlas (TCGA)
-breast cancer cohort collected using 450k methylation arrays
-Report ...
+breast cancer cohort collected using 450k methylation arrays.
+}
+\details{
+The dataset contains 293 rows representing individual probes and
+300 columns representing samples from the TCGA-BRCA cohort. The values in
+the data frame represent methylation levels.
+}
+\examples{
+data(betas)
+head(betas)
 }
 \keyword{datasets}

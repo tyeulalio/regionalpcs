@@ -7,19 +7,25 @@
 get_sig_pcs(x, method = "gd", verbose = FALSE)
 }
 \arguments{
-\item{x}{A data frame or matrix of methylation value, rows=features, columns=samples}
+\item{x}{A data frame or matrix of methylation values;
+rows = features, columns = samples}
 
-\item{method}{String indicating the method for estimating dimension; "gd"=Gavish-Donoho (default), "mp"=Marchenko-Pastur}
+\item{method}{String indicating the method for estimating dimension;
+"gd" = Gavish-Donoho (default), "mp" = Marchenko-Pastur}
 
 \item{verbose}{Boolean; print output statements}
 }
 \value{
-List containing four elements; sig_pcs = significant PCs, percent_var = percent variance explained, loadings = PC loadings, est_dim = estimated dimension
+List containing four elements;
+sig_pcs = significant PCs,
+percent_var = percent variance explained,
+loadings = PC loadings,
+est_dim = estimated dimension
 }
 \description{
 Get significant principal components
 }
 \examples{
 x <- diag(4)
-get_sig_pcs(x, "gv")
+get_sig_pcs(x, "gd")
 }

@@ -3,28 +3,49 @@
 \docType{data}
 \name{gene_annots}
 \alias{gene_annots}
-\title{Annotations for gene promoter regions}
+\title{Title: Annotations for Gene Promoter Regions}
 \format{
 \subsection{\code{gene_annots}}{
 
-A data frame with XXX rows and XXX columns:
-\describe{
-\item{country}{Country name}
-\item{iso2, iso3}{2 & 3 letter ISO country codes}
-\item{year}{Year}
-...
-}
+A data frame with 19374 rows and 16 columns
 }
 }
 \source{
-<>
+None
 }
 \usage{
-gene_annots
+data(gene_annots)
+}
+\value{
+\subsection{\code{gene_annots}}{
+
+A data frame with 19374 rows and 16 columns
+\describe{
+\item{seqnames}{Chromosome names (e.g., chr1, chr2, ...)}
+\item{start}{Start position of the promoter region}
+\item{end}{End position of the promoter region}
+\item{width}{Width of the promoter region}
+\item{strand}{Strand (+/-)}
+\item{tx_id}{Transcript ID (ENST)}
+\item{type}{Type of the region (e.g., hg38)}
+\item{gencode_gene_id}{Gencode Gene ID (ENSG)}
+\item{gencode_gene_type}{Gene type (e.g., protein coding)}
+\item{gencode_gene_name}{Gene name (e.g., SAMD11)}
+\item{transcript_type}{Type of the transcript (e.g., protein coding)}
+\item{transcript_name}{Transcript name}
+\item{transcript_support_level}{Transcript support level}
+\item{tag}{Tag for the entry}
+\item{is_canonical}{Logical indicating if the transcript is canonical}
+\item{gencode_region}{Gencode region information}
+}
+}
 }
 \description{
-Annotations containing the start and end boundaries of
-gene promoters for protein coding genes.
-Report ...
+Annotations containing the
+start and end boundaries of gene promoters for protein-coding genes.
+}
+\examples{
+data(gene_annots)
+head(gene_annots)
 }
 \keyword{datasets}

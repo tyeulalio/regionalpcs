@@ -2,8 +2,12 @@
 library(readr)
 
 # define paths here to hide them from the final document
-tcga_path <- paste0("D:/montgomery_lab/deconvolution_project/making_r_package/regionalpcs_data/tcga450k/normal_exp_meth/")
-gene_annots_path <- paste0("D:/montgomery_lab/deconvolution_project/making_r_package/regionalpcs_data/gene_annotations/")
+tcga_path <- paste0("D:/montgomery_lab/deconvolution_project/",
+  "making_r_package/regionalpcs_data/tcga450k/normal_exp_meth/")
+gene_annots_path <- paste0("D:/montgomery_lab/",
+  "deconvolution_project/making_r_package/",
+  "regionalpcs_data/gene_annotations/")
+
 
 # methylation data
 datafile <- paste0(tcga_path, "methylation_data.rds")
@@ -45,6 +49,7 @@ keep_cpgs <- unique(c(multi_map$cpg_id, other_map$cpg_id))
 # subset the betas
 betas <- betas[keep_cpgs,1:300]
 usethis::use_data(betas, overwrite = TRUE)
+
 
 # annotation data
 datafile <- paste0(gene_annots_path, "hg38_genes_promoters_annotations.tsv")

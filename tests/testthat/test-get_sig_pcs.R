@@ -5,7 +5,7 @@ test_that("get_sig_pcs() returns correct dimension", {
 
 ## -- checking parameters
 test_that("get_sig_pcs() checks method parameter", {
-  expect_equal(get_sig_pcs(t(mtcars), "method"), -1)
+  expect_error(get_sig_pcs(t(mtcars), "method"))
 })
 
 test_that("get_sig_pcs() checks x parameter for matrix", {
@@ -17,5 +17,5 @@ test_that("get_sig_pcs() checks x parameter for dataframe", {
 })
 
 test_that("get_sig_pcs() checks x parameter for wrong input", {
-  expect_equal(get_sig_pcs("x", "gd"), -1)
+  expect_error(get_sig_pcs("x", "gd"))
 })

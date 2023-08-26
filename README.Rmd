@@ -1,30 +1,51 @@
 ---
-output: github_document
+title: "regionalpcs"
+output: BiocStyle::html_document
+vignette: >
+  %\VignetteIndexEntry{regionalpcs}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
 ---
-
 
 ```{r, include = FALSE}
 knitr::opts_chunk$set(
-  collapse = TRUE,
-  comment = "#>",
-  echo = TRUE,
-  fig.path = "man/figures/README-",
-  out.width = "100%"
+    collapse = TRUE,
+    comment = "#>",
+    echo = TRUE
 )
 ```
 
 # regionalpcs
 
-The goal of *regionalpcs* is to provide functions to easily summarize DNA methylation data on a regional level using regional principal components (rPCs). The rPCs help to capture more biologically-relevant signals for downstream analyses..
+Tiffany Eulalio
+
+The `regionalpcs` package aims to address the challenge of summarizing 
+and interpreting DNA methylation data at a regional level. Traditional methods 
+of analysis may not capture the biological complexity of methylation patterns,
+potentially leading to less accurate or less meaningful interpretations. 
+This package introduces the concept of regional principal components (rPCs) 
+as a tool for capturing more biologically relevant signals in DNA methylation 
+data. By using rPCs, researchers can gain new insights into complex 
+interactions and effects in methylation data that might otherwise be missed.
 
 
-## Installation
+# Installation
+You can install the regionalpcs package from Bioconductor 
+using the following command:
 
-You can install the development version of regionalpcs from [GitHub](https://github.com/) with:
+```{r eval=FALSE}
+if (!requireNamespace("BiocManager", quietly=TRUE))
+    install.packages("BiocManager")
 
-```r
+BiocManager::install("regionalpcs")
+```
+
+You can install the development version of regionalpcs from GitHub with:
+
+```{r eval=FALSE}
 # install devtool package if needed
-# install.packages("devtools")
+if (!requireNamespace("devtools", quietly=TRUE))
+    install.packages("devtools")
 
 # download the regionalpcs package
 devtools::install_github("tyeulalio/regionalpcs")
@@ -32,21 +53,11 @@ devtools::install_github("tyeulalio/regionalpcs")
 
 # `regionalpcs` R Package Tutorial 
 
-#### Table of Contents
-- [`regionalpcs` R Package Tutorial](#-regionalpcs--r-package-tutorial)
-  * [Loading packages](#loading-packages)
-  * [Loading in a dataset](#loading-in-a-dataset)
-  * [Getting methylation array probe positions](#getting-methylation-array-probe-positions)
-  * [Process and filter the methylation data.](#process-and-filter-the-methylation-data)
-  * [Summarizing gene region types](#summarizing-gene-region-types)
-    + [Loading gene region annotations](#loading-gene-region-annotations)
-    + [Creating a region map](#creating-a-region-map)
-    + [Summarize gene regions](#summarize-gene-regions)
+## Loading Required Packages
+This tutorial depends on several Bioconductor packages. These packages should be
+loaded at the beginning of the analysis.
 
-## Loading packages
-To begin working with the *regionalpcs* R package, we need to first load it into our R session along with some other necessary packages. We can do this using the **`library()`** function in R. Here's an example code snippet to load the required packages:
-
-```{r setup, message=FALSE, warning=FALSE}
+```{r load-packages, message=FALSE, warning=FALSE}
 library(regionalpcs)
 library(RNOmni)
 library(GenomicRanges)
@@ -55,223 +66,305 @@ library(liftOver)
 library(tidyverse)
 ```
 
-Here, we load the *regionalpcs* package, which is the main package we'll be using in this tutorial. We also load *RNOmni*, which provides normalization functions, *GenomicRanges*, which provides tools for working with genomic intervals, and *tidyverse*, which provides a suite of tools for data manipulation and visualization.
+Here, we load the regionalpcs package, which is the main package we’ll be 
+using in this tutorial. We also load RNOmni, which provides normalization
+functions, GenomicRanges, which provides tools for working with genomic
+intervals, and tidyverse, which provides a suite of tools for data 
+manipulation and visualization.
 
-It's important to note that you need to have these packages installed on your machine before loading them. You can install them using the **`install.packages()`** function in R.
+It’s important to note that you need to have these packages installed on your
+machine before loading them. You can install them using the install.packages()
+function in R.
 
-Once the packages are loaded, we can start using the functions provided by each package.
-
-
-## Loading in a dataset
-
-In this section, we'll load a methylation dataset collected from TCGA using 450k methylation arrays. Before we can start any analysis, we need to load in the data and take a look at what we're working with.
-
-The **`betas`** dataset included with the `regionalpcs` package contains methylation values for 293 methylation sites and 300 individuals. We've subset the original dataset to save space and compute time for this vignette. To work well for downstream statistical analyses, we'll need to normalize the beta values by removing low variance CpGs and applying the inverse normal transform.
+Once the packages are loaded, we can start using the functions provided by each
+package.
 
 
-```{r view_data}
-head(betas)[1:3]
+## Load the dataset
+
+### Overview
+The betas dataset in the `regionalpcs` package is a subset of 450k array
+methylation data from TCGA, containing 293 methylation sites and 300 samples. We'll load this data into our R session and explore its structure.
+
+```{r load-data}
+data("betas", package = "regionalpcs")
+```
+
+### Inspecting the Data
+We can take a quick look at the dimensions of the dataset and the first few 
+rows to understand its structure.
+
+```{r inspect-data}
+head(betas)[, 1:3]
 dim(betas)
 ```
 
-We can see that the row names contain CpG IDs and positions, while the columns contain methylation beta values, which range from 0 to 1.
+Note that the row names are CpG IDs and genomic positions, and the columns 
+contain methylation beta values ranging from 0 to 1 for individual samples.
 
-## Getting methylation array probe positions
 
-In methylation array data, we may have only the probe ID without a position. To obtain the probe position, we can use Illumina annotations for the 450k methylation arrays found in the *IlluminaHumanMethylation450kanno.ilmn12.hg19* R package. In this example, we will extract the probe names from our betas data frame and separate the probe name from the CpG position using regex to find the last underscore.
+## Obtaining Methylation Array Probe Positions
 
-```{r}
-# get the probe names from the betas data frame
-cpg_df <- data.frame(cpgs=rownames(betas)) %>%
-  # separate the probe name from the cpg position using regex to find the last underscore
-  separate(cpgs, into=c('cpg_pos', 'probe'), sep= "_(?=[^_]+$)", extra='merge')
+### Introduction
+To perform accurate and informative analyses on methylation array data, it is 
+critical to have precise genomic positions for each probe. The
+`IlluminaHumanMethylation450kanno.ilmn12.hg19` package contains annotations for 
+450k methylation arrays, which can be utilized for this purpose. This section 
+will walk you through the steps to associate each probe in your dataset with 
+its genomic position.
+
+### Extract Probe Names and Positions
+First, we'll extract the probe names from the betas data frame and use regular
+expressions to separate the CpG identifier from its genomic position.
+
+```{r extract-probe}
+# Extract probe names and CpG positions from row names of 'betas'
+cpg_df <- data.frame(cpgs = rownames(betas)) %>%
+    separate(cpgs,
+        into = c("cpg_pos", "probe"), sep = "_(?=[^_]+$)",
+        extra = "merge"
+    )
 head(cpg_df)
-
-# load the Illumina 450k array probe positions
-data(Locations)
-probe_positions=data.frame(Locations)
-head(probe_positions)
-
-# attach probe positions to our cpg data frame
-# format the data frame first
-formatted_probe_positions <- probe_positions %>%
-  rownames_to_column('probe')
-head(formatted_probe_positions)
-
-# now attach the data frames
-new_cpg_df <- cpg_df %>%
-  left_join(formatted_probe_positions, by='probe')
-head(new_cpg_df)
-
 ```
 
-In the above code, we first obtain the probe names from the betas data frame and then use regular expressions to separate the probe name from the CpG position. Next, we load the Illumina 450k array probe positions and attach them to our *new_cpg_df* data frame.
+### Load Illumina 450k Array Probe Positions
+Next, let's load the Illumina 450k array probe positions for further annotation.
 
-However, note that the `pos` column from the *Locations* data frame does not match the positions in our `cpg_pos` column. This is because the genomic builds do not match. The *IlluminaHumanMethylation450kanno.ilmn12.hg19* annotations are in the hg19 build, and we are working with hg38 genomic annotations for this analysis. To convert hg19 positions to hg38, we use the *GenomicRanges* and *liftOver* packages. Here's a quick example on how to lift over positions from one build to another. Always ensure that you are working with the correct genome build and that the build matches across all your datasets, or else you will run into big issues!
+```{r illumina-anno}
+data(Locations)
+probe_positions <- data.frame(Locations)
+head(probe_positions)
+```
 
-We need a chain file to lift the genomic positions. The chain file is an annotation file that links the positions between the genome builds. You can download this file from the (UCSC golden path download site)[https://hgdownload.cse.ucsc.edu/goldenpath/hg19/liftOver/]. Be sure to download the file that maps between the appropriate builds. We'll be mapping from hg19 to hg38. We've included the chain used in this analysis as a part of the regionalpcs package, which can be accessed in the "extdata" folder as shown in the code below.
+### Merge Data Frames
+Now, we merge the extracted probe names with the Illumina 450k array probe 
+positions.
 
-```{r}
-# convert hg19 positions into a genomic ranges object
+```{r merge-probe}
+formatted_probe_positions <- probe_positions %>%
+    rownames_to_column("probe")
 
-# genomic ranges expects a start and end position so let's add this
+new_cpg_df <- cpg_df %>%
+    left_join(formatted_probe_positions, by = "probe")
+head(new_cpg_df)
+```
+
+### Addressing Genome Build Discrepancies
+It's critical to ensure that the genome builds match across datasets. In this 
+example, we'll use the `GenomicRanges` and `liftOver` packages to convert the 
+genomic positions from hg19 to hg38. Here’s a quick example on how to lift over positions from one build to another. **Always ensure that you are working with the correct genome build and that the build matches across all your datasets, or else you will run into big issues!**
+
+We need a chain file to lift the genomic positions. The chain file is an
+annotation file that links the positions between the genome builds. You can
+download this file from the (UCSC golden path download
+site)[https://hgdownload.cse.ucsc.edu/goldenpath/hg19/liftOver/]. Be sure to
+download the file that maps between the appropriate builds. We’ll be mapping 
+from hg19 to hg38. We’ve included the chain used in this analysis as a part of
+the regionalpcs package, which can be accessed in the “extdata” folder as shown
+in the code below.
+
+```{r lift-over}
+# Convert hg19 positions into a GenomicRanges object
 hg19_pos <- new_cpg_df %>%
-  # select the hg19 positions from the data frame we created
-  select('chr', 'pos', 'strand', 'probe') %>%
-  # create a start/end column
-  mutate(start = pos,
-         end = as.numeric(pos)+1)
-head(hg19_pos)
+    select("chr", "pos", "strand", "probe") %>%
+    mutate(start = pos, end = pos + 1)
 
-# now create the genomic ranges object
 hg19_pos_gr <- makeGRangesFromDataFrame(hg19_pos, keep.extra.columns = TRUE)
-hg19_pos_gr
 
-# now use liftOver to convert positions to hg38
-# load the chain file
-chain_file <- system.file("extdata", "hg19toHg38.over.chain", package="regionalpcs")
+# Load chain file and liftOver positions
+chain_file <- system.file("extdata", "hg19toHg38.over.chain",
+    package = "regionalpcs"
+)
 chain <- import.chain(chain_file)
 
-# liftover
 hg38_pos <- liftOver(hg19_pos_gr, chain) %>%
-  as.data.frame()
-head(hg38_pos)
+    as.data.frame()
 
-# let's rename the columns and connect it back with our cpg annotations
+# Merge the lifted positions back to the original data frame
 formatted_hg38 <- hg38_pos %>%
-  select(chrom_hg38 = seqnames, pos_hg38=start, probe)
-head(formatted_hg38)
+    select(chrom_hg38 = seqnames, pos_hg38 = start, probe)
 
 lifted_cpg_df <- new_cpg_df %>%
-  left_join(formatted_hg38, by='probe')
+    left_join(formatted_hg38, by = "probe")
 head(lifted_cpg_df)
-
 ```
 
-With probe positions and genome builds sorted out, we can move on to preprocessing the methylation array data. This usually involves filtering probes with low variability, removing any missing values, and normalizing the beta values. In addition, we may want to perform batch correction or adjust for other sources of technical or biological variation. We'll cover these steps in more detail later in the tutorial. It's important to ensure that our preprocessing steps are appropriate for our research question and dataset, as they can affect downstream analyses and interpretations.
+Now that we have accurate genomic positions for each probe and have harmonized 
+genome builds, we can proceed with preprocessing the methylation data.
 
 
-## Process and filter the methylation data.
+## Processing and Filtering Methylation Data
 
-In this section, we'll remove low variance CpGs and normalize our methylation beta values using the inverse normal transform.
+### Introduction
+Before conducting downstream analyses, it is essential to preprocess and clean 
+the methylation data. In this section, we'll walk you through the steps to 
+remove low variance CpGs and normalize the methylation beta values.
 
-```{r}
-# remove low variance cpgs
-var_betas <- betas[apply(betas, 1, var, na.rm=TRUE) != 0,] %>%
-  na.omit()
+### Remove Low Variance CpGs
+Firstly, we aim to filter out low variance CpGs. Variability is a crucial 
+factor, as low variance CpGs may not provide much information for downstream 
+analyses.
+
+In this section, we'll remove low variance CpGs and normalize our methylation 
+beta values using the inverse normal transform.
+
+```{r remove-low-var}
+# Remove CpGs with zero variance
+var_betas <- betas[apply(betas, 1, var, na.rm = TRUE) != 0, ] %>%
+    na.omit()
 dim(var_betas)
 ```
-We are being lenient here and only remove CpGs that have zero variance. However, we can come back and change this threshold later if needed.
+We only remove CpGs that have zero variance in this example. You can adjust 
+this threshold according to the requirements of your specific analysis.
 
-Now, let's normalize our methylation values to deal with the heteroscedasticity present in methylation data. We'll apply the inverse normal transform using functions from the **`RNOmni`** package by applying the **`RankNorm`** function to each row of our data frame.
+### Normalize Methylation Values
+Methylation data often exhibit heteroscedasticity. Therefore, we'll normalize 
+the beta values using inverse normal transformation. For this, we'll use the
+`RankNorm` function from the `RNOmni`  package.
 
-```{r}
-# inverse normal transform our methylation beta values
+```{r normalize-values}
+# Apply inverse normal transformation to methylation beta values
 int_meth <- apply(var_betas, 1, RankNorm) %>%
-  t() %>%
-  as.data.frame()
+    t() %>%
+    as.data.frame()
 ```
 
-With our filtered and normalized data, we can now summarize region types using the **`regionalpcs`** package.
+After these preprocessing steps, you will have a dataset ready for downstream 
+analysis with the `regionalpcs` package. We'll cover how to perform these 
+analyses in subsequent sections of this tutorial.
 
-## Summarizing gene region types
+## Summarizing Gene Region Types
 
-### Loading gene region annotations
-We'll start by loading gene region annotations. Make sure that these annotations are using the same genomic reference build (GrCh37, GrCh38) as your CpG annotations. **All annotations included with the *regionalpcs* package are in build hg38.**
+### Introduction
+Gene regions are significant functional units of the genome, such as promoters, 
+gene bodies, and intergenic regions. We'll focus on summarizing these regions 
+to prepare for downstream analyses. We will use the `regionalpcs` package to 
+perform these tasks.
+
+### Load Gene Region Annotations
+First, let's load the gene region annotations. Make sure to align the genomic 
+builds of your annotations and methylation data.
+
+**All annotations included with the `regionalpcs` package are in build hg38.**
 
 ```{r}
-#  load gene region annotation file
+# Load the gene region annotation file
+data("gene_annots", package = "regionalpcs")
 head(gene_annots)
 ```
-The **`gene_annots`** dataset contains annotations for different gene regions, such as promoters, gene bodies, and intergenic regions. 
+The `gene_annots`  dataset includes annotations for various gene regions.
 
-### Creating a region map
+### Create a Region Map
 
-Before summarizing gene regions using **`compute_regional_pcs`**, we need to create a region map that assigns CpGs to gene regions. This map enables us to identify which CpGs fall into each gene region, and the function **`make_region_map`** from the *regionalpcs* package automates this process for us.
+Before summarizing gene regions using `compute_regional_pcs`, we need to create 
+a region map that assigns CpGs to gene regions. This map enables us to identify
+which CpGs fall into each gene region.
 
-To create the region map, we need genomic positions for our CpGs, which we can obtain from the row names of our methylation data frame.
+#### Extract CpG Positions
+Start by extracting the CpG positions from your methylation data frame's row 
+names.
 
-
-```{r}
+```{r extract-cpg}
 head(int_meth)[1:4]
-
-# Get CpG positions from methylation data frame row names
-cpg_info = data.frame(cpg_id=rownames(int_meth)) %>%
-  # separate info from the cpg ID's
-  separate(cpg_id, into=c('chrom', 'start', 'end', 'cpg_name'), sep='_', remove=FALSE)
+# Extract CpG information
+cpg_info <- data.frame(cpg_id = rownames(int_meth)) %>%
+    separate(cpg_id,
+        into = c("chrom", "start", "end", "cpg_name"),
+        sep = "_", remove = FALSE
+    )
 head(cpg_info)
 ```
 
-
-Next, we convert our CpG information and gene region annotations to `GenomicRanges` objects to find the overlaps between the two using `findOverlaps.`
+#### Convert to GenomicRanges and Find Overlaps
+Next, we'll use the `GenomicRanges` package to find overlaps between CpGs and 
+gene regions.
 
 ```{r, warning=FALSE}
-# Convert CpG info and gene annotations to GenomicRanges objects
+# Convert to GenomicRanges
 cpg_gr <- makeGRangesFromDataFrame(cpg_info, keep.extra.columns = TRUE)
 annots_gr <- makeGRangesFromDataFrame(gene_annots, keep.extra.columns = TRUE)
 
 # Find overlaps between the two GRanges objects
-overlaps <- findOverlaps(query=cpg_gr, subject=annots_gr) %>%
-  as.data.frame()
+overlaps <- findOverlaps(query = cpg_gr, subject = annots_gr) %>%
+    as.data.frame()
 head(overlaps)
 
 # Match overlaps
-matched_cpg <- cpg_gr[overlaps$queryHits,] %>%
-  as.data.frame() %>%
-  select(cpg_id)
+matched_cpg <- cpg_gr[overlaps$queryHits, ] %>%
+    as.data.frame() %>%
+    select(cpg_id)
 
 # Select overlapped rows and just keep the columns we need
-matched_annots <- annots_gr[overlaps$subjectHits,] %>%
-  as.data.frame() %>%
-  select(gencode_gene_id)
+matched_annots <- annots_gr[overlaps$subjectHits, ] %>%
+    as.data.frame() %>%
+    select(gencode_gene_id)
 
 # Combine the matched CpGs and gene annotations to form the region map
-region_map <- cbind(matched_annots, matched_cpg) 
+region_map <- cbind(matched_annots, matched_cpg)
 head(region_map)
 length(unique(region_map$gencode_gene_id))
-
 ```
+With these steps, you'll have a region map that assigns CpGs to specific gene 
+regions, which can be essential for downstream analyses.
 
 
-We can see the resulting region map, which summarizes how our CpGs are assigned to gene regions.
+### Summarizing Gene Regions with Regional Principal Components
 
+In this final section, we'll summarize gene regions using Principal 
+Components (PCs) to capture the maximum variation. We'll utilize the
+`compute_regional_pcs` function from the `regionalpcs` package for this.
 
-### Summarize gene regions
+#### Compute Regional PCs
+Let's calculate the regional PCs using a subset of our gene regions for 
+demonstration purposes.
 
-We'll use the `compute_regional_pcs` function to get regional PCs using default settings. 
-
-```{r}
+```{r compute-regional-pcs}
+# Display head of region map
 head(region_map)
-sub_region_map <- region_map %>%
-  filter(gencode_gene_id %in% unique(region_map$gencode_gene_id)[1:1000])
 
+# Subset the region map
+sub_region_map <- region_map %>%
+    filter(gencode_gene_id %in% unique(region_map$gencode_gene_id)[1:1000])
+
+# Compute regional PCs
 res <- compute_regional_pcs(int_meth, sub_region_map)
 ```
 
-The `compute_regional_pcs` function returns a list containing important elements from our regional PC summary method. To understand the output, we can inspect the names of the list elements:
+#### Inspecting the Output
+The function returns a list containing multiple elements. Let's first look at 
+what these elements are.
 
-```{r}
+```{r inspect-output}
+# Inspect the output list elements
 names(res)
 ```
 
-The first element of this list is the regional PCs. These are the summaries for each region contained in the input `region_map.` To select and inspect the regional PCs, we can do the following:
+#### Extracting and Viewing Regional PCs
+The first element (`res$regional_pcs`) is a data frame containing the 
+calculated regional PCs.
 
-```{r}
-# select the regional pcs
+
+```{r extract-regional-pcs}
+# Extract regional PCs
 regional_pcs <- res$regional_pcs
 head(regional_pcs)[1:4]
 ```
-The output is a data frame with regional PCs for each region as rows and our samples as columns. This is our new representation of methylation values, now on a gene regional PC scale. We can feed these into downstream analyses as is.
 
-The number of regional PCs representing each gene region was determined by the Gavish-Donoho method. This method allows us to identify PCs that capture actual signal in our data and not the noise that is inherent in any dataset.
+#### Understanding the Results
+The output is a data frame with regional PCs for each region as rows and our
+samples as columns. This is our new representation of methylation values, now 
+on a gene regional PC scale. We can feed these into downstream analyses as is.
 
-We can check the number of gene regions and regional PCs we have now:
+The number of regional PCs representing each gene region was determined by the
+Gavish-Donoho method. This method allows us to identify PCs that capture actual 
+signal in our data and not the noise that is inherent in any dataset. To explore
+alternative methods, we can change the `pc_method` parameter.
 
 
-```{r}
-# separate the genes from the pc numbers
-regions <- data.frame(gene_pc=rownames(regional_pcs)) %>%
-  separate(gene_pc, into=c('gene', 'pc'), sep='-')
+```{r count-pcs-regions}
+# Count the number of unique gene regions and PCs
+regions <- data.frame(gene_pc = rownames(regional_pcs)) %>%
+    separate(gene_pc, into = c("gene", "pc"), sep = "-")
 head(regions)
 
 # number of genes that have been summarized
@@ -280,19 +373,24 @@ length(unique(regions$gene))
 # how many of each PC did we get
 table(regions$pc)
 ```
-We have summarized each of our genes using just one PC. The number of PCs depends on three main factors: the number of samples, the number of CpGs in the gene region, and the noise in the methylation data.
+We have summarized each of our genes using just one PC. The number of PCs 
+depends on three main factors: the number of samples, the number of CpGs in 
+the gene region, and the noise in the methylation data.
 
-By default, the `compute_regional_pcs` function uses the Gavish-Donoho method. However, we can also use the Marcenko-Pasteur method by setting the `pc_method` parameter:
+By default, the `compute_regional_pcs` function uses the Gavish-Donoho method.
+However, we can also use the Marcenko-Pasteur method by setting the `pc_method`
+parameter:
 
-```{r}
-mp_res <- compute_regional_pcs(int_meth, sub_region_map, pc_method='mp')
+```{r marcenko-pasteur-method}
+# Using Marcenko-Pasteur method
+mp_res <- compute_regional_pcs(int_meth, sub_region_map, pc_method = "mp")
 
 # select the regional pcs
 mp_regional_pcs <- mp_res$regional_pcs
 
 # separate the genes from the pc numbers
-mp_regions <- data.frame(gene_pc=rownames(mp_regional_pcs)) %>%
-  separate(gene_pc, into=c('gene', 'pc'), sep='-')
+mp_regions <- data.frame(gene_pc = rownames(mp_regional_pcs)) %>%
+    separate(gene_pc, into = c("gene", "pc"), sep = "-")
 head(mp_regions)
 
 # number of genes that have been summarized
@@ -300,12 +398,25 @@ length(unique(mp_regions$gene))
 
 # how many of each PC did we get
 table(mp_regions$pc)
-
-# multi_genes <- mp_regions %>%
-#   filter(pc %in% c('PC2', 'PC3', 'PC4'))
-# head(multi_genes)
 ```
 
-The Marcenko-Pasteur and the Gavish-Donoho methods are both based on Random Matrix Theory, and they aim to identify the number of significant PCs that capture the true signal in the data and not just the noise. However, these methods differ in how they select the number of significant PCs. The Marcenko-Pasteur method typically selects more PCs to represent a gene region compared to the Gavish-Donoho method. This may be due to the different ways in which the two methods estimate the noise level in the data.
+The Marcenko-Pasteur and the Gavish-Donoho methods are both based on Random 
+Matrix Theory, and they aim to identify the number of significant PCs that 
+capture the true signal in the data and not just the noise. However, these 
+methods differ in how they select the number of significant PCs. The 
+Marcenko-Pasteur method typically selects more PCs to represent a gene region 
+compared to the Gavish-Donoho method. This may be due to the different ways in 
+which the two methods estimate the noise level in the data.
 
-Ultimately, the choice between the two methods depends on the specific needs and goals of the analysis. The Gavish-Donoho method tends to provide more conservative results, while the Marcenko-Pasteur method may capture more of the underlying signal in the data. Researchers should carefully consider their objectives and the characteristics of their data when selecting a method.
+Ultimately, the choice between the two methods depends on the specific needs 
+and goals of the analysis. The Gavish-Donoho method tends to provide more 
+conservative results, while the Marcenko-Pasteur method may capture more of 
+the underlying signal in the data. Researchers should carefully consider 
+their objectives and the characteristics of their data when selecting a method.
+
+
+# Session Information
+
+```{r sessionInfo}
+sessionInfo()
+```

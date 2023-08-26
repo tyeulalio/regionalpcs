@@ -4,16 +4,22 @@
 \alias{summarize_region}
 \title{Summarize a region using regional principal components}
 \usage{
-summarize_region(region, region_map, meth, pc_method, verbose)
+summarize_region(region, region_map, meth, pc_method, verbose = FALSE)
 }
 \arguments{
 \item{region}{String; name of region being processed}
 
-\item{region_map}{Data frame; Mapping of CpGs to regions, column 1 should be regions, column 2 should be CpGs with the same names as the rows of meth}
+\item{region_map}{Data frame;
+Mapping of CpGs to regions,
+column 1 should be regions,
+column 2 should be CpGs with the same names as the rows of meth}
 
-\item{meth}{Data frame or matrix; Methylation values to summarize; rows=CpGs, columns=samples}
+\item{meth}{Data frame or matrix;
+Methylation values to summarize; rows=CpGs, columns=samples}
 
-\item{pc_method}{String; indicating the method for estimating dimension; "gd"=Gavish-Donoho (default), "mp"=Marchenko-Pastur}
+\item{pc_method}{String;
+indicating the method for estimating dimension;
+"gd"=Gavish-Donoho (default), "mp"=Marchenko-Pastur}
 
 \item{verbose}{Boolean; print output statements}
 }
@@ -22,4 +28,16 @@ list containing PC results
 }
 \description{
 Summarize a region using regional principal components
+}
+\examples{
+# Create the region map with just one region containing 10 CpGs
+region_map <- data.frame(region_id = rep(1, 10), cpg_id = seq(1, 10))
+
+# Create methylation data frame
+set.seed(123)
+meth <- as.data.frame(matrix(runif(10 * 20, min = 0, max = 1), nrow = 10))
+rownames(meth) <- seq(1, 10)
+
+# Call the function
+summarize_region(1, region_map, meth, 'gd')
 }

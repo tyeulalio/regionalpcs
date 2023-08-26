@@ -2,30 +2,39 @@
 % Please edit documentation in R/get_sig_pcs.R
 \name{compute_dimension}
 \alias{compute_dimension}
-\title{Compute significant dimensions of a matrix using the Marchenko-Pastur or Gavish-Donoho methods}
+\title{Compute significant dimensions of a matrix
+using the Marchenko-Pastur or Gavish-Donoho methods}
 \usage{
 compute_dimension(x, var_explained, noise_select, method, verbose = FALSE)
 }
 \arguments{
-\item{x}{A data frame or matrix of methylation value, rows=features, columns=samples}
+\item{x}{A data frame or matrix of methylation values;
+rows = features, columns = samples}
 
-\item{var_explained}{A numeric vector containing the variance explained by successive PCs. This should be sorted in decreasing order. (Used for PCAtools)}
+\item{var_explained}{A numeric vector containing the
+variance explained by successive PCs,
+sorted in decreasing order. (Used for PCAtools)}
 
-\item{noise_select}{Numeric scalar specifying the variance of the random noise (Used for PCAtools)}
+\item{noise_select}{Numeric scalar specifying the
+variance of the random noise (Used for PCAtools)}
 
-\item{method}{String indicating the method for estimating dimension; "gd"=Gavish-Donoho (default), "mp"=Marchenko-Pastur}
+\item{method}{String indicating the method for estimating dimension;
+"gd" = Gavish-Donoho (default), "mp" = Marchenko-Pastur}
 
-\item{verbose}{Boolean indicating whether to print statements while running, default=FALSE}
+\item{verbose}{Boolean indicating whether to print
+statements while running, default = FALSE}
 }
 \value{
-Numeric scalar representing the optimal number of PCs to retain using the specified method
+Numeric scalar representing the optimal
+number of PCs to retain using the specified method
 }
 \description{
-Compute significant dimensions of a matrix using the Marchenko-Pastur or Gavish-Donoho methods
+Compute significant dimensions of a matrix
+using the Marchenko-Pastur or Gavish-Donoho methods
 }
 \examples{
 x <- diag(4)
-pca_res <- PCAtools::pca(x) # run PCA
-eig_sq <- pca_res$sdev^2 # compute variance explained
-compute_dimension(x, eig_sq, 1, "gv")
+pca_res <- PCAtools::pca(x) # Run PCA
+eig_sq <- pca_res$sdev^2 # Compute variance explained
+compute_dimension(x, eig_sq, 1, "gd")
 }
