@@ -1,6 +1,49 @@
 regionalpcs
 ================
 
+# Table of Contents
+
+1.  [Introduction](#introduction)
+2.  [Installation](#installation)
+3.  [regionalpcs R Package Tutorial](#regionalpcs-r-package-tutorial)
+    - 3.1 [Loading Required Packages](#loading-required-packages)
+    - 3.2 [Load the Dataset](#load-the-dataset)
+      - 3.2.1 [Overview](#overview)
+      - 3.2.2 [Inspecting the Data](#inspecting-the-data)
+    - 3.3 [Obtaining Methylation Array Probe
+      Positions](#obtaining-methylation-array-probe-positions)
+      - 3.3.1 [Introduction](#introduction-1)
+      - 3.3.2 [Extract Probe Names and
+        Positions](#extract-probe-names-and-positions)
+      - 3.3.3 [Load Illumina 450k Array Probe
+        Positions](#load-illuminaprobe-positions)
+      - 3.3.4 [Merge Data Frames](#merge-data-frames)
+      - 3.3.5 [Addressing Genome Build
+        Discrepancies](#addressing-genome-build-discrepancies)
+    - 3.4 [Processing and Filtering Methylation
+      Data](#processing-and-filtering-methylation-data)
+      - 3.4.1 [Introduction](#introduction-2)
+      - 3.4.2 [Remove Low Variance CpGs](#remove-low-variance-cpgs)
+      - 3.4.3 [Normalize Methylation
+        Values](#normalize-methylation-values)
+    - 3.5 [Summarizing Gene Region
+      Types](#summarizing-gene-region-types)
+      - 3.5.1 [Introduction](#introduction-3)
+      - 3.5.2 [Load Gene Region
+        Annotations](#load-gene-region-annotations)
+      - 3.5.3 [Create a Region Map](#create-a-region-map)
+        - 3.5.3.1 [Extract CpG Positions](#extract-cpg-positions)
+        - 3.5.3.2 [Convert to GenomicRanges and Find
+          Overlaps](#convert-to-genomicranges-and-find-overlaps)
+      - 3.5.4 [Summarizing Gene Regions with Regional Principal
+        Components](#summarizing-gene-regions-with-regional-principal-components)
+        - 3.5.4.1 [Compute Regional PCs](#compute-regional-pcs)
+        - 3.5.4.2 [Inspecting the Output](#inspecting-the-output)
+        - 3.5.4.3 [Extracting and Viewing Regional
+          PCs](#extracting-and-viewing-regional-pcs)
+        - 3.5.4.4 [Understanding the
+          Results](#understanding-the-results)
+
 # regionalpcs
 
 Tiffany Eulalio
