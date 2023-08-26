@@ -1,19 +1,38 @@
+regionalpcs
+================
 
 # regionalpcs
 
-The goal of *regionalpcs* is to provide functions to easily summarize
-DNA methylation data on a regional level using regional principal
-components (rPCs). The rPCs help to capture more biologically-relevant
-signals for downstream analyses..
+Tiffany Eulalio
 
-## Installation
+The `regionalpcs` package aims to address the challenge of summarizing
+and interpreting DNA methylation data at a regional level. Traditional
+methods of analysis may not capture the biological complexity of
+methylation patterns, potentially leading to less accurate or less
+meaningful interpretations. This package introduces the concept of
+regional principal components (rPCs) as a tool for capturing more
+biologically relevant signals in DNA methylation data. By using rPCs,
+researchers can gain new insights into complex interactions and effects
+in methylation data that might otherwise be missed.
 
-You can install the development version of regionalpcs from
-[GitHub](https://github.com/) with:
+# Installation
+
+You can install the regionalpcs package from Bioconductor using the
+following command:
+
+``` r
+if (!requireNamespace("BiocManager", quietly=TRUE))
+    install.packages("BiocManager")
+
+BiocManager::install("regionalpcs")
+```
+
+You can install the development version of regionalpcs from GitHub with:
 
 ``` r
 # install devtool package if needed
-# install.packages("devtools")
+if (!requireNamespace("devtools", quietly=TRUE))
+    install.packages("devtools")
 
 # download the regionalpcs package
 devtools::install_github("tyeulalio/regionalpcs")
@@ -21,27 +40,10 @@ devtools::install_github("tyeulalio/regionalpcs")
 
 # `regionalpcs` R Package Tutorial
 
-#### Table of Contents
+## Loading Required Packages
 
-- [`regionalpcs` R Package Tutorial](#-regionalpcs--r-package-tutorial)
-  - [Loading packages](#loading-packages)
-  - [Loading in a dataset](#loading-in-a-dataset)
-  - [Getting methylation array probe
-    positions](#getting-methylation-array-probe-positions)
-  - [Process and filter the methylation
-    data.](#process-and-filter-the-methylation-data)
-  - [Summarizing gene region types](#summarizing-gene-region-types)
-    - [Loading gene region
-      annotations](#loading-gene-region-annotations)
-    - [Creating a region map](#creating-a-region-map)
-    - [Summarize gene regions](#summarize-gene-regions)
-
-## Loading packages
-
-To begin working with the *regionalpcs* R package, we need to first load
-it into our R session along with some other necessary packages. We can
-do this using the **`library()`** function in R. Here’s an example code
-snippet to load the required packages:
+This tutorial depends on several Bioconductor packages. These packages
+should be loaded at the beginning of the analysis.
 
 ``` r
 library(regionalpcs)
@@ -52,34 +54,39 @@ library(liftOver)
 library(tidyverse)
 ```
 
-Here, we load the *regionalpcs* package, which is the main package we’ll
-be using in this tutorial. We also load *RNOmni*, which provides
-normalization functions, *GenomicRanges*, which provides tools for
-working with genomic intervals, and *tidyverse*, which provides a suite
-of tools for data manipulation and visualization.
+Here, we load the regionalpcs package, which is the main package we’ll
+be using in this tutorial. We also load RNOmni, which provides
+normalization functions, GenomicRanges, which provides tools for working
+with genomic intervals, and tidyverse, which provides a suite of tools
+for data manipulation and visualization.
 
 It’s important to note that you need to have these packages installed on
 your machine before loading them. You can install them using the
-**`install.packages()`** function in R.
+install.packages() function in R.
 
 Once the packages are loaded, we can start using the functions provided
 by each package.
 
-## Loading in a dataset
+## Load the dataset
 
-In this section, we’ll load a methylation dataset collected from TCGA
-using 450k methylation arrays. Before we can start any analysis, we need
-to load in the data and take a look at what we’re working with.
+### Overview
 
-The **`betas`** dataset included with the `regionalpcs` package contains
-methylation values for 293 methylation sites and 300 individuals. We’ve
-subset the original dataset to save space and compute time for this
-vignette. To work well for downstream statistical analyses, we’ll need
-to normalize the beta values by removing low variance CpGs and applying
-the inverse normal transform.
+The betas dataset in the `regionalpcs` package is a subset of 450k array
+methylation data from TCGA, containing 293 methylation sites and 300
+samples. We’ll load this data into our R session and explore its
+structure.
 
 ``` r
-head(betas)[1:3]
+data("betas", package = "regionalpcs")
+```
+
+### Inspecting the Data
+
+We can take a quick look at the dimensions of the dataset and the first
+few rows to understand its structure.
+
+``` r
+head(betas)[, 1:3]
 #>                                     TCGA-EJ-7781-11A TCGA-BH-A1FE-11B
 #> chr16_53434200_53434201_cg00000029        0.20361112       0.13654490
 #> chr15_22838620_22838621_cg00000622        0.01311223       0.01024075
@@ -98,24 +105,34 @@ dim(betas)
 #> [1] 293 300
 ```
 
-We can see that the row names contain CpG IDs and positions, while the
-columns contain methylation beta values, which range from 0 to 1.
+Note that the row names are CpG IDs and genomic positions, and the
+columns contain methylation beta values ranging from 0 to 1 for
+individual samples.
 
-## Getting methylation array probe positions
+## Obtaining Methylation Array Probe Positions
 
-In methylation array data, we may have only the probe ID without a
-position. To obtain the probe position, we can use Illumina annotations
-for the 450k methylation arrays found in the
-*IlluminaHumanMethylation450kanno.ilmn12.hg19* R package. In this
-example, we will extract the probe names from our betas data frame and
-separate the probe name from the CpG position using regex to find the
-last underscore.
+### Introduction
+
+To perform accurate and informative analyses on methylation array data,
+it is critical to have precise genomic positions for each probe. The
+`IlluminaHumanMethylation450kanno.ilmn12.hg19` package contains
+annotations for 450k methylation arrays, which can be utilized for this
+purpose. This section will walk you through the steps to associate each
+probe in your dataset with its genomic position.
+
+### Extract Probe Names and Positions
+
+First, we’ll extract the probe names from the betas data frame and use
+regular expressions to separate the CpG identifier from its genomic
+position.
 
 ``` r
-# get the probe names from the betas data frame
-cpg_df <- data.frame(cpgs=rownames(betas)) %>%
-  # separate the probe name from the cpg position using regex to find the last underscore
-  separate(cpgs, into=c('cpg_pos', 'probe'), sep= "_(?=[^_]+$)", extra='merge')
+# Extract probe names and CpG positions from row names of 'betas'
+cpg_df <- data.frame(cpgs = rownames(betas)) %>%
+    separate(cpgs,
+        into = c("cpg_pos", "probe"), sep = "_(?=[^_]+$)",
+        extra = "merge"
+    )
 head(cpg_df)
 #>                    cpg_pos      probe
 #> 1  chr16_53434200_53434201 cg00000029
@@ -124,10 +141,16 @@ head(cpg_df)
 #> 4 chr8_119416178_119416179 cg00002464
 #> 5 chr6_169751536_169751537 cg00005543
 #> 6  chr12_52069532_52069533 cg00006122
+```
 
-# load the Illumina 450k array probe positions
+### Load Illumina 450k Array Probe Positions
+
+Next, let’s load the Illumina 450k array probe positions for further
+annotation.
+
+``` r
 data(Locations)
-probe_positions=data.frame(Locations)
+probe_positions <- data.frame(Locations)
 head(probe_positions)
 #>             chr      pos strand
 #> cg00050873 chrY  9363356      -
@@ -136,23 +159,19 @@ head(probe_positions)
 #> cg00214611 chrY 15815688      -
 #> cg00455876 chrY  9385539      -
 #> cg01707559 chrY  6778695      +
+```
 
-# attach probe positions to our cpg data frame
-# format the data frame first
+### Merge Data Frames
+
+Now, we merge the extracted probe names with the Illumina 450k array
+probe positions.
+
+``` r
 formatted_probe_positions <- probe_positions %>%
-  rownames_to_column('probe')
-head(formatted_probe_positions)
-#>        probe  chr      pos strand
-#> 1 cg00050873 chrY  9363356      -
-#> 2 cg00212031 chrY 21239348      -
-#> 3 cg00213748 chrY  8148233      -
-#> 4 cg00214611 chrY 15815688      -
-#> 5 cg00455876 chrY  9385539      -
-#> 6 cg01707559 chrY  6778695      +
+    rownames_to_column("probe")
 
-# now attach the data frames
 new_cpg_df <- cpg_df %>%
-  left_join(formatted_probe_positions, by='probe')
+    left_join(formatted_probe_positions, by = "probe")
 head(new_cpg_df)
 #>                    cpg_pos      probe   chr       pos strand
 #> 1  chr16_53434200_53434201 cg00000029 chr16  53468112      +
@@ -163,21 +182,15 @@ head(new_cpg_df)
 #> 6  chr12_52069532_52069533 cg00006122 chr12  52463316      +
 ```
 
-In the above code, we first obtain the probe names from the betas data
-frame and then use regular expressions to separate the probe name from
-the CpG position. Next, we load the Illumina 450k array probe positions
-and attach them to our *new_cpg_df* data frame.
+### Addressing Genome Build Discrepancies
 
-However, note that the `pos` column from the *Locations* data frame does
-not match the positions in our `cpg_pos` column. This is because the
-genomic builds do not match. The
-*IlluminaHumanMethylation450kanno.ilmn12.hg19* annotations are in the
-hg19 build, and we are working with hg38 genomic annotations for this
-analysis. To convert hg19 positions to hg38, we use the *GenomicRanges*
-and *liftOver* packages. Here’s a quick example on how to lift over
-positions from one build to another. Always ensure that you are working
-with the correct genome build and that the build matches across all your
-datasets, or else you will run into big issues!
+It’s critical to ensure that the genome builds match across datasets. In
+this example, we’ll use the `GenomicRanges` and `liftOver` packages to
+convert the genomic positions from hg19 to hg38. Here’s a quick example
+on how to lift over positions from one build to another. **Always ensure
+that you are working with the correct genome build and that the build
+matches across all your datasets, or else you will run into big
+issues!**
 
 We need a chain file to lift the genomic positions. The chain file is an
 annotation file that links the positions between the genome builds. You
@@ -189,82 +202,28 @@ this analysis as a part of the regionalpcs package, which can be
 accessed in the “extdata” folder as shown in the code below.
 
 ``` r
-# convert hg19 positions into a genomic ranges object
-
-# genomic ranges expects a start and end position so let's add this
+# Convert hg19 positions into a GenomicRanges object
 hg19_pos <- new_cpg_df %>%
-  # select the hg19 positions from the data frame we created
-  select('chr', 'pos', 'strand', 'probe') %>%
-  # create a start/end column
-  mutate(start = pos,
-         end = as.numeric(pos)+1)
-head(hg19_pos)
-#>     chr       pos strand      probe     start       end
-#> 1 chr16  53468112      + cg00000029  53468112  53468113
-#> 2 chr15  23034447      + cg00000622  23034447  23034448
-#> 3  chr1 166958439      - cg00001349 166958439 166958440
-#> 4  chr8 120428418      + cg00002464 120428418 120428419
-#> 5  chr6 170151632      + cg00005543 170151632 170151633
-#> 6 chr12  52463316      + cg00006122  52463316  52463317
+    select("chr", "pos", "strand", "probe") %>%
+    mutate(start = pos, end = pos + 1)
 
-# now create the genomic ranges object
 hg19_pos_gr <- makeGRangesFromDataFrame(hg19_pos, keep.extra.columns = TRUE)
-hg19_pos_gr
-#> GRanges object with 293 ranges and 2 metadata columns:
-#>         seqnames              ranges strand |       pos       probe
-#>            <Rle>           <IRanges>  <Rle> | <integer> <character>
-#>     [1]    chr16   53468112-53468113      + |  53468112  cg00000029
-#>     [2]    chr15   23034447-23034448      + |  23034447  cg00000622
-#>     [3]     chr1 166958439-166958440      - | 166958439  cg00001349
-#>     [4]     chr8 120428418-120428419      + | 120428418  cg00002464
-#>     [5]     chr6 170151632-170151633      + | 170151632  cg00005543
-#>     ...      ...                 ...    ... .       ...         ...
-#>   [289]     chr4 177715040-177715041      - | 177715040  cg24194285
-#>   [290]     chr1 110453144-110453145      - | 110453144  cg24326142
-#>   [291]    chr12   53399544-53399545      - |  53399544  cg24502904
-#>   [292]     chr1 110453002-110453003      - | 110453002  cg25730577
-#>   [293]     chr7 143060150-143060151      - | 143060150  cg26575389
-#>   -------
-#>   seqinfo: 19 sequences from an unspecified genome; no seqlengths
 
-# now use liftOver to convert positions to hg38
-# load the chain file
-chain_file <- system.file("extdata", "hg19toHg38.over.chain", package="regionalpcs")
+# Load chain file and liftOver positions
+chain_file <- system.file("extdata", "hg19toHg38.over.chain",
+    package = "regionalpcs"
+)
 chain <- import.chain(chain_file)
 
-# liftover
 hg38_pos <- liftOver(hg19_pos_gr, chain) %>%
-  as.data.frame()
-head(hg38_pos)
-#>   group group_name seqnames     start       end width strand       pos
-#> 1     1       <NA>    chr16  53434200  53434201     2      +  53468112
-#> 2     2       <NA>    chr15  22838620  22838621     2      -  23034447
-#> 3     3       <NA>     chr1 166989202 166989203     2      - 166958439
-#> 4     4       <NA>     chr8 119416178 119416179     2      + 120428418
-#> 5     5       <NA>     chr6 169751536 169751537     2      + 170151632
-#> 6     6       <NA>    chr12  52069532  52069533     2      +  52463316
-#>        probe
-#> 1 cg00000029
-#> 2 cg00000622
-#> 3 cg00001349
-#> 4 cg00002464
-#> 5 cg00005543
-#> 6 cg00006122
+    as.data.frame()
 
-# let's rename the columns and connect it back with our cpg annotations
+# Merge the lifted positions back to the original data frame
 formatted_hg38 <- hg38_pos %>%
-  select(chrom_hg38 = seqnames, pos_hg38=start, probe)
-head(formatted_hg38)
-#>   chrom_hg38  pos_hg38      probe
-#> 1      chr16  53434200 cg00000029
-#> 2      chr15  22838620 cg00000622
-#> 3       chr1 166989202 cg00001349
-#> 4       chr8 119416178 cg00002464
-#> 5       chr6 169751536 cg00005543
-#> 6      chr12  52069532 cg00006122
+    select(chrom_hg38 = seqnames, pos_hg38 = start, probe)
 
 lifted_cpg_df <- new_cpg_df %>%
-  left_join(formatted_hg38, by='probe')
+    left_join(formatted_hg38, by = "probe")
 head(lifted_cpg_df)
 #>                    cpg_pos      probe   chr       pos strand chrom_hg38
 #> 1  chr16_53434200_53434201 cg00000029 chr16  53468112      +      chr16
@@ -282,88 +241,105 @@ head(lifted_cpg_df)
 #> 6  52069532
 ```
 
-With probe positions and genome builds sorted out, we can move on to
-preprocessing the methylation array data. This usually involves
-filtering probes with low variability, removing any missing values, and
-normalizing the beta values. In addition, we may want to perform batch
-correction or adjust for other sources of technical or biological
-variation. We’ll cover these steps in more detail later in the tutorial.
-It’s important to ensure that our preprocessing steps are appropriate
-for our research question and dataset, as they can affect downstream
-analyses and interpretations.
+Now that we have accurate genomic positions for each probe and have
+harmonized genome builds, we can proceed with preprocessing the
+methylation data.
 
-## Process and filter the methylation data.
+## Processing and Filtering Methylation Data
+
+### Introduction
+
+Before conducting downstream analyses, it is essential to preprocess and
+clean the methylation data. In this section, we’ll walk you through the
+steps to remove low variance CpGs and normalize the methylation beta
+values.
+
+### Remove Low Variance CpGs
+
+Firstly, we aim to filter out low variance CpGs. Variability is a
+crucial factor, as low variance CpGs may not provide much information
+for downstream analyses.
 
 In this section, we’ll remove low variance CpGs and normalize our
 methylation beta values using the inverse normal transform.
 
 ``` r
-# remove low variance cpgs
-var_betas <- betas[apply(betas, 1, var, na.rm=TRUE) != 0,] %>%
-  na.omit()
+# Remove CpGs with zero variance
+var_betas <- betas[apply(betas, 1, var, na.rm = TRUE) != 0, ] %>%
+    na.omit()
 dim(var_betas)
 #> [1] 293 300
 ```
 
-We are being lenient here and only remove CpGs that have zero variance.
-However, we can come back and change this threshold later if needed.
+We only remove CpGs that have zero variance in this example. You can
+adjust this threshold according to the requirements of your specific
+analysis.
 
-Now, let’s normalize our methylation values to deal with the
-heteroscedasticity present in methylation data. We’ll apply the inverse
-normal transform using functions from the **`RNOmni`** package by
-applying the **`RankNorm`** function to each row of our data frame.
+### Normalize Methylation Values
+
+Methylation data often exhibit heteroscedasticity. Therefore, we’ll
+normalize the beta values using inverse normal transformation. For this,
+we’ll use the `RankNorm` function from the `RNOmni` package.
 
 ``` r
-# inverse normal transform our methylation beta values
+# Apply inverse normal transformation to methylation beta values
 int_meth <- apply(var_betas, 1, RankNorm) %>%
-  t() %>%
-  as.data.frame()
+    t() %>%
+    as.data.frame()
 ```
 
-With our filtered and normalized data, we can now summarize region types
-using the **`regionalpcs`** package.
+After these preprocessing steps, you will have a dataset ready for
+downstream analysis with the `regionalpcs` package. We’ll cover how to
+perform these analyses in subsequent sections of this tutorial.
 
-## Summarizing gene region types
+## Summarizing Gene Region Types
 
-### Loading gene region annotations
+### Introduction
 
-We’ll start by loading gene region annotations. Make sure that these
-annotations are using the same genomic reference build (GrCh37, GrCh38)
-as your CpG annotations. **All annotations included with the
-*regionalpcs* package are in build hg38.**
+Gene regions are significant functional units of the genome, such as
+promoters, gene bodies, and intergenic regions. We’ll focus on
+summarizing these regions to prepare for downstream analyses. We will
+use the `regionalpcs` package to perform these tasks.
+
+### Load Gene Region Annotations
+
+First, let’s load the gene region annotations. Make sure to align the
+genomic builds of your annotations and methylation data.
+
+**All annotations included with the `regionalpcs` package are in build
+hg38.**
 
 ``` r
-#  load gene region annotation file
+# Load the gene region annotation file
+data("gene_annots", package = "regionalpcs")
 head(gene_annots)
-#> # A tibble: 6 x 16
-#>   seqna~1  start    end width strand tx_id type  genco~2 genco~3 genco~4 trans~5
-#>   <chr>    <dbl>  <dbl> <dbl> <chr>  <chr> <chr> <chr>   <chr>   <chr>   <chr>  
-#> 1 chr1    9.23e5 9.24e5  1000 +      ENST~ hg38~ ENSG00~ protei~ SAMD11  protei~
-#> 2 chr1    9.60e5 9.61e5  1000 +      ENST~ hg38~ ENSG00~ protei~ KLHL17  protei~
-#> 3 chr1    9.65e5 9.66e5  1000 +      ENST~ hg38~ ENSG00~ protei~ PLEKHN1 protei~
-#> 4 chr1    1.00e6 1.00e6  1000 +      ENST~ hg38~ ENSG00~ protei~ ISG15   protei~
-#> 5 chr1    1.02e6 1.02e6  1000 +      ENST~ hg38~ ENSG00~ protei~ AGRN    protei~
-#> 6 chr1    1.17e6 1.17e6  1000 +      ENST~ hg38~ ENSG00~ protei~ TTLL10  protei~
-#> # ... with 5 more variables: transcript_name <chr>,
+#> # A tibble: 6 × 16
+#>   seqnames   start     end width strand tx_id             type   gencode_gene_id
+#>   <chr>      <dbl>   <dbl> <dbl> <chr>  <chr>             <chr>  <chr>          
+#> 1 chr1      922928  923927  1000 +      ENST00000420190.6 hg38_… ENSG0000018763…
+#> 2 chr1      959584  960583  1000 +      ENST00000338591.8 hg38_… ENSG0000018796…
+#> 3 chr1      965482  966481  1000 +      ENST00000379410.8 hg38_… ENSG0000018758…
+#> 4 chr1     1000138 1001137  1000 +      ENST00000624697.4 hg38_… ENSG0000018760…
+#> 5 chr1     1019120 1020119  1000 +      ENST00000379370.7 hg38_… ENSG0000018815…
+#> 6 chr1     1172903 1173902  1000 +      ENST00000379290.5 hg38_… ENSG0000016257…
+#> # ℹ 8 more variables: gencode_gene_type <chr>, gencode_gene_name <chr>,
+#> #   transcript_type <chr>, transcript_name <chr>,
 #> #   transcript_support_level <dbl>, tag <chr>, is_canonical <lgl>,
-#> #   gencode_region <chr>, and abbreviated variable names 1: seqnames,
-#> #   2: gencode_gene_id, 3: gencode_gene_type, 4: gencode_gene_name,
-#> #   5: transcript_type
+#> #   gencode_region <chr>
 ```
 
-The **`gene_annots`** dataset contains annotations for different gene
-regions, such as promoters, gene bodies, and intergenic regions.
+The `gene_annots` dataset includes annotations for various gene regions.
 
-### Creating a region map
+### Create a Region Map
 
-Before summarizing gene regions using **`compute_regional_pcs`**, we
-need to create a region map that assigns CpGs to gene regions. This map
-enables us to identify which CpGs fall into each gene region, and the
-function **`make_region_map`** from the *regionalpcs* package automates
-this process for us.
+Before summarizing gene regions using `compute_regional_pcs`, we need to
+create a region map that assigns CpGs to gene regions. This map enables
+us to identify which CpGs fall into each gene region.
 
-To create the region map, we need genomic positions for our CpGs, which
-we can obtain from the row names of our methylation data frame.
+#### Extract CpG Positions
+
+Start by extracting the CpG positions from your methylation data frame’s
+row names.
 
 ``` r
 head(int_meth)[1:4]
@@ -381,11 +357,12 @@ head(int_meth)[1:4]
 #> chr8_119416178_119416179_cg00002464        0.2402219       -0.2574441
 #> chr6_169751536_169751537_cg00005543        0.9080280       -1.5657713
 #> chr12_52069532_52069533_cg00006122         0.3271598       -0.1129440
-
-# Get CpG positions from methylation data frame row names
-cpg_info = data.frame(cpg_id=rownames(int_meth)) %>%
-  # separate info from the cpg ID's
-  separate(cpg_id, into=c('chrom', 'start', 'end', 'cpg_name'), sep='_', remove=FALSE)
+# Extract CpG information
+cpg_info <- data.frame(cpg_id = rownames(int_meth)) %>%
+    separate(cpg_id,
+        into = c("chrom", "start", "end", "cpg_name"),
+        sep = "_", remove = FALSE
+    )
 head(cpg_info)
 #>                                cpg_id chrom     start       end   cpg_name
 #> 1  chr16_53434200_53434201_cg00000029 chr16  53434200  53434201 cg00000029
@@ -396,18 +373,19 @@ head(cpg_info)
 #> 6  chr12_52069532_52069533_cg00006122 chr12  52069532  52069533 cg00006122
 ```
 
-Next, we convert our CpG information and gene region annotations to
-`GenomicRanges` objects to find the overlaps between the two using
-`findOverlaps.`
+#### Convert to GenomicRanges and Find Overlaps
+
+Next, we’ll use the `GenomicRanges` package to find overlaps between
+CpGs and gene regions.
 
 ``` r
-# Convert CpG info and gene annotations to GenomicRanges objects
+# Convert to GenomicRanges
 cpg_gr <- makeGRangesFromDataFrame(cpg_info, keep.extra.columns = TRUE)
 annots_gr <- makeGRangesFromDataFrame(gene_annots, keep.extra.columns = TRUE)
 
 # Find overlaps between the two GRanges objects
-overlaps <- findOverlaps(query=cpg_gr, subject=annots_gr) %>%
-  as.data.frame()
+overlaps <- findOverlaps(query = cpg_gr, subject = annots_gr) %>%
+    as.data.frame()
 head(overlaps)
 #>   queryHits subjectHits
 #> 1         1       12678
@@ -418,17 +396,17 @@ head(overlaps)
 #> 6         6       10306
 
 # Match overlaps
-matched_cpg <- cpg_gr[overlaps$queryHits,] %>%
-  as.data.frame() %>%
-  select(cpg_id)
+matched_cpg <- cpg_gr[overlaps$queryHits, ] %>%
+    as.data.frame() %>%
+    select(cpg_id)
 
 # Select overlapped rows and just keep the columns we need
-matched_annots <- annots_gr[overlaps$subjectHits,] %>%
-  as.data.frame() %>%
-  select(gencode_gene_id)
+matched_annots <- annots_gr[overlaps$subjectHits, ] %>%
+    as.data.frame() %>%
+    select(gencode_gene_id)
 
 # Combine the matched CpGs and gene annotations to form the region map
-region_map <- cbind(matched_annots, matched_cpg) 
+region_map <- cbind(matched_annots, matched_cpg)
 head(region_map)
 #>      gencode_gene_id                              cpg_id
 #> 1 ENSG00000103479.16  chr16_53434200_53434201_cg00000029
@@ -441,15 +419,22 @@ length(unique(region_map$gencode_gene_id))
 #> [1] 52
 ```
 
-We can see the resulting region map, which summarizes how our CpGs are
-assigned to gene regions.
+With these steps, you’ll have a region map that assigns CpGs to specific
+gene regions, which can be essential for downstream analyses.
 
-### Summarize gene regions
+### Summarizing Gene Regions with Regional Principal Components
 
-We’ll use the `compute_regional_pcs` function to get regional PCs using
-default settings.
+In this final section, we’ll summarize gene regions using Principal
+Components (PCs) to capture the maximum variation. We’ll utilize the
+`compute_regional_pcs` function from the `regionalpcs` package for this.
+
+#### Compute Regional PCs
+
+Let’s calculate the regional PCs using a subset of our gene regions for
+demonstration purposes.
 
 ``` r
+# Display head of region map
 head(region_map)
 #>      gencode_gene_id                              cpg_id
 #> 1 ENSG00000103479.16  chr16_53434200_53434201_cg00000029
@@ -458,28 +443,34 @@ head(region_map)
 #> 4  ENSG00000136999.5 chr8_119416178_119416179_cg00002464
 #> 5 ENSG00000130023.16 chr6_169751536_169751537_cg00005543
 #> 6 ENSG00000123395.14  chr12_52069532_52069533_cg00006122
-sub_region_map <- region_map %>%
-  filter(gencode_gene_id %in% unique(region_map$gencode_gene_id)[1:1000])
 
+# Subset the region map
+sub_region_map <- region_map %>%
+    filter(gencode_gene_id %in% unique(region_map$gencode_gene_id)[1:1000])
+
+# Compute regional PCs
 res <- compute_regional_pcs(int_meth, sub_region_map)
-#> [1] "Using Gavish-Donoho method"
+#> Using Gavish-Donoho method
 ```
 
-The `compute_regional_pcs` function returns a list containing important
-elements from our regional PC summary method. To understand the output,
-we can inspect the names of the list elements:
+#### Inspecting the Output
+
+The function returns a list containing multiple elements. Let’s first
+look at what these elements are.
 
 ``` r
+# Inspect the output list elements
 names(res)
 #> [1] "regional_pcs"     "percent_variance" "loadings"         "info"
 ```
 
-The first element of this list is the regional PCs. These are the
-summaries for each region contained in the input `region_map.` To select
-and inspect the regional PCs, we can do the following:
+#### Extracting and Viewing Regional PCs
+
+The first element (`res$regional_pcs`) is a data frame containing the
+calculated regional PCs.
 
 ``` r
-# select the regional pcs
+# Extract regional PCs
 regional_pcs <- res$regional_pcs
 head(regional_pcs)[1:4]
 #>                        TCGA-EJ-7781-11A TCGA-BH-A1FE-11B TCGA-BH-A0C3-11A
@@ -498,6 +489,8 @@ head(regional_pcs)[1:4]
 #> ENSG00000123395.14-PC1        1.3592205
 ```
 
+#### Understanding the Results
+
 The output is a data frame with regional PCs for each region as rows and
 our samples as columns. This is our new representation of methylation
 values, now on a gene regional PC scale. We can feed these into
@@ -506,14 +499,13 @@ downstream analyses as is.
 The number of regional PCs representing each gene region was determined
 by the Gavish-Donoho method. This method allows us to identify PCs that
 capture actual signal in our data and not the noise that is inherent in
-any dataset.
-
-We can check the number of gene regions and regional PCs we have now:
+any dataset. To explore alternative methods, we can change the
+`pc_method` parameter.
 
 ``` r
-# separate the genes from the pc numbers
-regions <- data.frame(gene_pc=rownames(regional_pcs)) %>%
-  separate(gene_pc, into=c('gene', 'pc'), sep='-')
+# Count the number of unique gene regions and PCs
+regions <- data.frame(gene_pc = rownames(regional_pcs)) %>%
+    separate(gene_pc, into = c("gene", "pc"), sep = "-")
 head(regions)
 #>                 gene  pc
 #> 1 ENSG00000103479.16 PC1
@@ -543,15 +535,16 @@ method. However, we can also use the Marcenko-Pasteur method by setting
 the `pc_method` parameter:
 
 ``` r
-mp_res <- compute_regional_pcs(int_meth, sub_region_map, pc_method='mp')
-#> [1] "Using Marchenko-Pastur method"
+# Using Marcenko-Pasteur method
+mp_res <- compute_regional_pcs(int_meth, sub_region_map, pc_method = "mp")
+#> Using Marchenko-Pastur method
 
 # select the regional pcs
 mp_regional_pcs <- mp_res$regional_pcs
 
 # separate the genes from the pc numbers
-mp_regions <- data.frame(gene_pc=rownames(mp_regional_pcs)) %>%
-  separate(gene_pc, into=c('gene', 'pc'), sep='-')
+mp_regions <- data.frame(gene_pc = rownames(mp_regional_pcs)) %>%
+    separate(gene_pc, into = c("gene", "pc"), sep = "-")
 head(mp_regions)
 #>                 gene  pc
 #> 1 ENSG00000103479.16 PC1
@@ -570,10 +563,6 @@ table(mp_regions$pc)
 #> 
 #> PC1 PC2 
 #>  52  26
-
-# multi_genes <- mp_regions %>%
-#   filter(pc %in% c('PC2', 'PC3', 'PC4'))
-# head(multi_genes)
 ```
 
 The Marcenko-Pasteur and the Gavish-Donoho methods are both based on
@@ -591,3 +580,134 @@ provide more conservative results, while the Marcenko-Pasteur method may
 capture more of the underlying signal in the data. Researchers should
 carefully consider their objectives and the characteristics of their
 data when selecting a method.
+
+# Session Information
+
+``` r
+sessionInfo()
+#> R version 4.3.1 (2023-06-16 ucrt)
+#> Platform: x86_64-w64-mingw32/x64 (64-bit)
+#> Running under: Windows 10 x64 (build 19045)
+#> 
+#> Matrix products: default
+#> 
+#> 
+#> locale:
+#> [1] LC_COLLATE=English_United States.utf8 
+#> [2] LC_CTYPE=English_United States.utf8   
+#> [3] LC_MONETARY=English_United States.utf8
+#> [4] LC_NUMERIC=C                          
+#> [5] LC_TIME=English_United States.utf8    
+#> 
+#> time zone: America/Los_Angeles
+#> tzcode source: internal
+#> 
+#> attached base packages:
+#> [1] parallel  stats4    stats     graphics  grDevices utils     datasets 
+#> [8] methods   base     
+#> 
+#> other attached packages:
+#>  [1] lubridate_1.9.2                                   
+#>  [2] forcats_1.0.0                                     
+#>  [3] stringr_1.5.0                                     
+#>  [4] dplyr_1.1.2                                       
+#>  [5] purrr_1.0.2                                       
+#>  [6] readr_2.1.4                                       
+#>  [7] tidyr_1.3.0                                       
+#>  [8] tibble_3.2.1                                      
+#>  [9] ggplot2_3.4.3                                     
+#> [10] tidyverse_2.0.0                                   
+#> [11] liftOver_1.25.0                                   
+#> [12] Homo.sapiens_1.3.1                                
+#> [13] TxDb.Hsapiens.UCSC.hg19.knownGene_3.2.2           
+#> [14] org.Hs.eg.db_3.17.0                               
+#> [15] GO.db_3.17.0                                      
+#> [16] OrganismDbi_1.43.0                                
+#> [17] GenomicFeatures_1.53.1                            
+#> [18] AnnotationDbi_1.63.2                              
+#> [19] rtracklayer_1.61.1                                
+#> [20] gwascat_2.33.0                                    
+#> [21] IlluminaHumanMethylation450kanno.ilmn12.hg19_0.6.1
+#> [22] minfi_1.47.0                                      
+#> [23] bumphunter_1.43.0                                 
+#> [24] locfit_1.5-9.8                                    
+#> [25] iterators_1.0.14                                  
+#> [26] foreach_1.5.2                                     
+#> [27] Biostrings_2.69.2                                 
+#> [28] XVector_0.41.1                                    
+#> [29] SummarizedExperiment_1.31.1                       
+#> [30] Biobase_2.61.0                                    
+#> [31] MatrixGenerics_1.13.1                             
+#> [32] matrixStats_1.0.0                                 
+#> [33] GenomicRanges_1.53.1                              
+#> [34] GenomeInfoDb_1.37.2                               
+#> [35] IRanges_2.35.2                                    
+#> [36] S4Vectors_0.39.1                                  
+#> [37] BiocGenerics_0.47.0                               
+#> [38] RNOmni_1.0.1                                      
+#> [39] regionalpcs_0.99.1                                
+#> 
+#> loaded via a namespace (and not attached):
+#>   [1] splines_4.3.1             BiocIO_1.11.0            
+#>   [3] bitops_1.0-7              filelock_1.0.2           
+#>   [5] preprocessCore_1.63.1     graph_1.79.0             
+#>   [7] XML_3.99-0.14             lifecycle_1.0.3          
+#>   [9] lattice_0.21-8            MASS_7.3-60              
+#>  [11] base64_2.0.1              scrime_1.3.5             
+#>  [13] magrittr_2.0.3            limma_3.57.7             
+#>  [15] rmarkdown_2.24            yaml_2.3.7               
+#>  [17] doRNG_1.8.6               askpass_1.1              
+#>  [19] cowplot_1.1.1             DBI_1.1.3                
+#>  [21] RColorBrewer_1.1-3        abind_1.4-5              
+#>  [23] zlibbioc_1.47.0           quadprog_1.5-8           
+#>  [25] RCurl_1.98-1.12           VariantAnnotation_1.47.1 
+#>  [27] rappdirs_0.3.3            GenomeInfoDbData_1.2.10  
+#>  [29] RMTstat_0.3.1             ggrepel_0.9.3            
+#>  [31] irlba_2.3.5.1             genefilter_1.83.1        
+#>  [33] dqrng_0.3.0               annotate_1.79.0          
+#>  [35] DelayedMatrixStats_1.23.4 codetools_0.2-19         
+#>  [37] DelayedArray_0.27.10      xml2_1.3.5               
+#>  [39] tidyselect_1.2.0          ScaledMatrix_1.9.1       
+#>  [41] beanplot_1.3.1            BiocFileCache_2.9.1      
+#>  [43] illuminaio_0.43.0         GenomicAlignments_1.37.0 
+#>  [45] multtest_2.57.0           survival_3.5-7           
+#>  [47] tools_4.3.1               progress_1.2.2           
+#>  [49] Rcpp_1.0.11               glue_1.6.2               
+#>  [51] SparseArray_1.1.11        xfun_0.40                
+#>  [53] HDF5Array_1.29.3          withr_2.5.0              
+#>  [55] BiocManager_1.30.22       fastmap_1.1.1            
+#>  [57] rhdf5filters_1.13.5       fansi_1.0.4              
+#>  [59] openssl_2.1.0             rsvd_1.0.5               
+#>  [61] digest_0.6.33             timechange_0.2.0         
+#>  [63] R6_2.5.1                  colorspace_2.1-0         
+#>  [65] biomaRt_2.57.1            RSQLite_2.3.1            
+#>  [67] utf8_1.2.3                generics_0.1.3           
+#>  [69] data.table_1.14.8         prettyunits_1.1.1        
+#>  [71] httr_1.4.7                S4Arrays_1.1.5           
+#>  [73] pkgconfig_2.0.3           gtable_0.3.3             
+#>  [75] blob_1.2.4                siggenes_1.75.0          
+#>  [77] htmltools_0.5.6           RBGL_1.77.1              
+#>  [79] scales_1.2.1              png_0.1-8                
+#>  [81] knitr_1.43                rstudioapi_0.15.0        
+#>  [83] reshape2_1.4.4            tzdb_0.4.0               
+#>  [85] rjson_0.2.21              nlme_3.1-163             
+#>  [87] curl_5.0.2                cachem_1.0.8             
+#>  [89] rhdf5_2.45.1              restfulr_0.0.15          
+#>  [91] GEOquery_2.69.0           pillar_1.9.0             
+#>  [93] grid_4.3.1                reshape_0.8.9            
+#>  [95] vctrs_0.6.3               BiocSingular_1.17.1      
+#>  [97] beachmat_2.17.15          dbplyr_2.3.3             
+#>  [99] xtable_1.8-4              evaluate_0.21            
+#> [101] cli_3.6.1                 compiler_4.3.1           
+#> [103] Rsamtools_2.17.0          rlang_1.1.1              
+#> [105] crayon_1.5.2              rngtools_1.5.2           
+#> [107] nor1mix_1.3-0             mclust_6.0.0             
+#> [109] plyr_1.8.8                stringi_1.7.12           
+#> [111] BiocParallel_1.35.3       munsell_0.5.0            
+#> [113] PCAtools_2.13.0           Matrix_1.6-1             
+#> [115] BSgenome_1.69.0           hms_1.1.3                
+#> [117] sparseMatrixStats_1.13.4  bit64_4.0.5              
+#> [119] Rhdf5lib_1.23.0           KEGGREST_1.41.0          
+#> [121] statmod_1.5.0             memoise_2.0.1            
+#> [123] snpStats_1.51.0           bit_4.0.5
+```

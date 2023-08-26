@@ -1,6 +1,6 @@
 ---
 title: "regionalpcs"
-output: BiocStyle::html_document
+output: github_document
 vignette: >
   %\VignetteIndexEntry{regionalpcs}
   %\VignetteEngine{knitr::rmarkdown}
