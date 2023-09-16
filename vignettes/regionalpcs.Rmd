@@ -54,8 +54,8 @@ devtools::install_github("tyeulalio/regionalpcs")
 # `regionalpcs` R Package Tutorial 
 
 ## Loading Required Packages
-This tutorial depends on several Bioconductor packages. These packages should be
-loaded at the beginning of the analysis.
+This tutorial depends on several Bioconductor packages. These packages should 
+be loaded at the beginning of the analysis.
 
 ```{r load-packages, message=FALSE, warning=FALSE}
 library(regionalpcs)
@@ -63,7 +63,10 @@ library(RNOmni)
 library(GenomicRanges)
 library(IlluminaHumanMethylation450kanno.ilmn12.hg19)
 library(liftOver)
-library(tidyverse)
+library(magrittr)
+library(tidyr)
+library(tibble)
+library(dplyr)
 ```
 
 Here, we load the regionalpcs package, which is the main package we’ll be 
@@ -84,7 +87,8 @@ package.
 
 ### Overview
 The betas dataset in the `regionalpcs` package is a subset of 450k array
-methylation data from TCGA, containing 293 methylation sites and 300 samples. We'll load this data into our R session and explore its structure.
+methylation data from TCGA, containing 293 methylation sites and 300 samples. 
+We'll load this data into our R session and explore its structure.
 
 ```{r load-data}
 data("betas", package = "regionalpcs")
@@ -152,7 +156,10 @@ head(new_cpg_df)
 ### Addressing Genome Build Discrepancies
 It's critical to ensure that the genome builds match across datasets. In this 
 example, we'll use the `GenomicRanges` and `liftOver` packages to convert the 
-genomic positions from hg19 to hg38. Here’s a quick example on how to lift over positions from one build to another. **Always ensure that you are working with the correct genome build and that the build matches across all your datasets, or else you will run into big issues!**
+genomic positions from hg19 to hg38. Here’s a quick example on how to lift over
+positions from one build to another. **Always ensure that you are working with 
+the correct genome build and that the build matches across all your datasets, 
+or else you will run into big issues!**
 
 We need a chain file to lift the genomic positions. The chain file is an
 annotation file that links the positions between the genome builds. You can
@@ -172,7 +179,7 @@ hg19_pos <- new_cpg_df %>%
 hg19_pos_gr <- makeGRangesFromDataFrame(hg19_pos, keep.extra.columns = TRUE)
 
 # Load chain file and liftOver positions
-chain_file <- system.file("extdata", "hg19toHg38.over.chain",
+chain_file <- system.file("extdata", "hg19ToHg38.over.chain",
     package = "regionalpcs"
 )
 chain <- import.chain(chain_file)

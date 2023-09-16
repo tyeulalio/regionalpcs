@@ -1,6 +1,6 @@
 Package: regionalpcs
 Title: Summarizing Regional Methylation with Regional Principal Components Analysis
-Version: 0.99.1
+Version: 0.99.2
 Authors@R: 
     person("Tiffany", "Eulalio", , "tyeulalio@gmail.com", 
            role = c("aut", "cre"), 
@@ -38,8 +38,8 @@ Suggests:
     RMTstat,
     RNOmni,
     testthat (>= 3.0.0), 
-    tidyverse,
-    BiocStyle
+    BiocStyle,
+    tidyr
 Config/testthat/edition: 3
 VignetteBuilder: knitr
 Depends: 

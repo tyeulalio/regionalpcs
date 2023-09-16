@@ -36,7 +36,7 @@ regionalpcs
         - 3.5.3.2 [Convert to GenomicRanges and Find
           Overlaps](#convert-to-genomicranges-and-find-overlaps)
       - 3.5.4 [Summarizing Gene Regions with Regional Principal
-        Components](#summarizing-gene-regions-with-regional-principal-components)
+        Components](#summarizing-gene-regions)
         - 3.5.4.1 [Compute Regional PCs](#compute-regional-pcs)
         - 3.5.4.2 [Inspecting the Output](#inspecting-the-output)
         - 3.5.4.3 [Extracting and Viewing Regional
@@ -94,7 +94,10 @@ library(RNOmni)
 library(GenomicRanges)
 library(IlluminaHumanMethylation450kanno.ilmn12.hg19)
 library(liftOver)
-library(tidyverse)
+library(magrittr)
+library(tidyr)
+library(tibble)
+library(dplyr)
 ```
 
 Here, we load the regionalpcs package, which is the main package we’ll
@@ -253,9 +256,13 @@ hg19_pos <- new_cpg_df %>%
 hg19_pos_gr <- makeGRangesFromDataFrame(hg19_pos, keep.extra.columns = TRUE)
 
 # Load chain file and liftOver positions
-chain_file <- system.file("extdata", "hg19toHg38.over.chain",
+chain_file <- system.file("extdata", "hg19ToHg38.over.chain",
     package = "regionalpcs"
 )
+print(paste("Using chain file for liftOver", chain_file))
+#> [1] "Using chain file for liftOver C:/Users/tyeul/AppData/Local/R/win-library/4.3/regionalpcs/extdata/hg19ToHg38.over.chain"
+print(file.exists(chain_file))
+#> [1] TRUE
 chain <- import.chain(chain_file)
 
 hg38_pos <- liftOver(hg19_pos_gr, chain) %>%
@@ -465,6 +472,8 @@ length(unique(region_map$gencode_gene_id))
 With these steps, you’ll have a region map that assigns CpGs to specific
 gene regions, which can be essential for downstream analyses.
 
+<a name="summarizing-gene-regions"></a>
+
 ### Summarizing Gene Regions with Regional Principal Components
 
 In this final section, we’ll summarize gene regions using Principal
@@ -650,45 +659,39 @@ sessionInfo()
 #> [8] methods   base     
 #> 
 #> other attached packages:
-#>  [1] lubridate_1.9.2                                   
-#>  [2] forcats_1.0.0                                     
-#>  [3] stringr_1.5.0                                     
-#>  [4] dplyr_1.1.2                                       
-#>  [5] purrr_1.0.2                                       
-#>  [6] readr_2.1.4                                       
-#>  [7] tidyr_1.3.0                                       
-#>  [8] tibble_3.2.1                                      
-#>  [9] ggplot2_3.4.3                                     
-#> [10] tidyverse_2.0.0                                   
-#> [11] liftOver_1.25.0                                   
-#> [12] Homo.sapiens_1.3.1                                
-#> [13] TxDb.Hsapiens.UCSC.hg19.knownGene_3.2.2           
-#> [14] org.Hs.eg.db_3.17.0                               
-#> [15] GO.db_3.17.0                                      
-#> [16] OrganismDbi_1.43.0                                
-#> [17] GenomicFeatures_1.53.1                            
-#> [18] AnnotationDbi_1.63.2                              
-#> [19] rtracklayer_1.61.1                                
-#> [20] gwascat_2.33.0                                    
-#> [21] IlluminaHumanMethylation450kanno.ilmn12.hg19_0.6.1
-#> [22] minfi_1.47.0                                      
-#> [23] bumphunter_1.43.0                                 
-#> [24] locfit_1.5-9.8                                    
-#> [25] iterators_1.0.14                                  
-#> [26] foreach_1.5.2                                     
-#> [27] Biostrings_2.69.2                                 
-#> [28] XVector_0.41.1                                    
-#> [29] SummarizedExperiment_1.31.1                       
-#> [30] Biobase_2.61.0                                    
-#> [31] MatrixGenerics_1.13.1                             
-#> [32] matrixStats_1.0.0                                 
-#> [33] GenomicRanges_1.53.1                              
-#> [34] GenomeInfoDb_1.37.2                               
-#> [35] IRanges_2.35.2                                    
-#> [36] S4Vectors_0.39.1                                  
-#> [37] BiocGenerics_0.47.0                               
-#> [38] RNOmni_1.0.1                                      
-#> [39] regionalpcs_0.99.1                                
+#>  [1] dplyr_1.1.2                                       
+#>  [2] tibble_3.2.1                                      
+#>  [3] tidyr_1.3.0                                       
+#>  [4] magrittr_2.0.3                                    
+#>  [5] liftOver_1.25.0                                   
+#>  [6] Homo.sapiens_1.3.1                                
+#>  [7] TxDb.Hsapiens.UCSC.hg19.knownGene_3.2.2           
+#>  [8] org.Hs.eg.db_3.17.0                               
+#>  [9] GO.db_3.17.0                                      
+#> [10] OrganismDbi_1.43.0                                
+#> [11] GenomicFeatures_1.53.1                            
+#> [12] AnnotationDbi_1.63.2                              
+#> [13] rtracklayer_1.61.1                                
+#> [14] gwascat_2.33.0                                    
+#> [15] IlluminaHumanMethylation450kanno.ilmn12.hg19_0.6.1
+#> [16] minfi_1.47.0                                      
+#> [17] bumphunter_1.43.0                                 
+#> [18] locfit_1.5-9.8                                    
+#> [19] iterators_1.0.14                                  
+#> [20] foreach_1.5.2                                     
+#> [21] Biostrings_2.69.2                                 
+#> [22] XVector_0.41.1                                    
+#> [23] SummarizedExperiment_1.31.1                       
+#> [24] Biobase_2.61.0                                    
+#> [25] MatrixGenerics_1.13.1                             
+#> [26] matrixStats_1.0.0                                 
+#> [27] GenomicRanges_1.53.1                              
+#> [28] GenomeInfoDb_1.37.2                               
+#> [29] IRanges_2.35.2                                    
+#> [30] S4Vectors_0.39.1                                  
+#> [31] BiocGenerics_0.47.0                               
+#> [32] RNOmni_1.0.1                                      
+#> [33] regionalpcs_0.99.1                                
 #> 
 #> loaded via a namespace (and not attached):
 #>   [1] splines_4.3.1             BiocIO_1.11.0            
@@ -697,12 +700,12 @@ sessionInfo()
 #>   [7] XML_3.99-0.14             lifecycle_1.0.3          
 #>   [9] lattice_0.21-8            MASS_7.3-60              
 #>  [11] base64_2.0.1              scrime_1.3.5             
-#>  [13] magrittr_2.0.3            limma_3.57.7             
-#>  [15] rmarkdown_2.24            yaml_2.3.7               
-#>  [17] doRNG_1.8.6               askpass_1.1              
-#>  [19] cowplot_1.1.1             DBI_1.1.3                
-#>  [21] RColorBrewer_1.1-3        abind_1.4-5              
-#>  [23] zlibbioc_1.47.0           quadprog_1.5-8           
+#>  [13] limma_3.57.7              rmarkdown_2.24           
+#>  [15] yaml_2.3.7                doRNG_1.8.6              
+#>  [17] askpass_1.1               cowplot_1.1.1            
+#>  [19] DBI_1.1.3                 RColorBrewer_1.1-3       
+#>  [21] abind_1.4-5               zlibbioc_1.47.0          
+#>  [23] quadprog_1.5-8            purrr_1.0.2              
 #>  [25] RCurl_1.98-1.12           VariantAnnotation_1.47.1 
 #>  [27] rappdirs_0.3.3            GenomeInfoDbData_1.2.10  
 #>  [29] RMTstat_0.3.1             ggrepel_0.9.3            
@@ -721,36 +724,37 @@ sessionInfo()
 #>  [55] BiocManager_1.30.22       fastmap_1.1.1            
 #>  [57] rhdf5filters_1.13.5       fansi_1.0.4              
 #>  [59] openssl_2.1.0             rsvd_1.0.5               
-#>  [61] digest_0.6.33             timechange_0.2.0         
-#>  [63] R6_2.5.1                  colorspace_2.1-0         
-#>  [65] biomaRt_2.57.1            RSQLite_2.3.1            
-#>  [67] utf8_1.2.3                generics_0.1.3           
-#>  [69] data.table_1.14.8         prettyunits_1.1.1        
-#>  [71] httr_1.4.7                S4Arrays_1.1.5           
-#>  [73] pkgconfig_2.0.3           gtable_0.3.3             
-#>  [75] blob_1.2.4                siggenes_1.75.0          
-#>  [77] htmltools_0.5.6           RBGL_1.77.1              
-#>  [79] scales_1.2.1              png_0.1-8                
-#>  [81] knitr_1.43                rstudioapi_0.15.0        
-#>  [83] reshape2_1.4.4            tzdb_0.4.0               
-#>  [85] rjson_0.2.21              nlme_3.1-163             
-#>  [87] curl_5.0.2                cachem_1.0.8             
-#>  [89] rhdf5_2.45.1              restfulr_0.0.15          
+#>  [61] digest_0.6.33             R6_2.5.1                 
+#>  [63] colorspace_2.1-0          biomaRt_2.57.1           
+#>  [65] RSQLite_2.3.1             utf8_1.2.3               
+#>  [67] generics_0.1.3            data.table_1.14.8        
+#>  [69] prettyunits_1.1.1         httr_1.4.7               
+#>  [71] S4Arrays_1.1.5            pkgconfig_2.0.3          
+#>  [73] gtable_0.3.3              blob_1.2.4               
+#>  [75] siggenes_1.75.0           htmltools_0.5.6          
+#>  [77] RBGL_1.77.1               scales_1.2.1             
+#>  [79] png_0.1-8                 knitr_1.43               
+#>  [81] rstudioapi_0.15.0         reshape2_1.4.4           
+#>  [83] tzdb_0.4.0                rjson_0.2.21             
+#>  [85] nlme_3.1-163              curl_5.0.2               
+#>  [87] cachem_1.0.8              rhdf5_2.45.1             
+#>  [89] stringr_1.5.0             restfulr_0.0.15          
 #>  [91] GEOquery_2.69.0           pillar_1.9.0             
 #>  [93] grid_4.3.1                reshape_0.8.9            
 #>  [95] vctrs_0.6.3               BiocSingular_1.17.1      
 #>  [97] beachmat_2.17.15          dbplyr_2.3.3             
 #>  [99] xtable_1.8-4              evaluate_0.21            
-#> [101] cli_3.6.1                 compiler_4.3.1           
-#> [103] Rsamtools_2.17.0          rlang_1.1.1              
-#> [105] crayon_1.5.2              rngtools_1.5.2           
-#> [107] nor1mix_1.3-0             mclust_6.0.0             
-#> [109] plyr_1.8.8                stringi_1.7.12           
-#> [111] BiocParallel_1.35.3       munsell_0.5.0            
-#> [113] PCAtools_2.13.0           Matrix_1.6-1             
-#> [115] BSgenome_1.69.0           hms_1.1.3                
-#> [117] sparseMatrixStats_1.13.4  bit64_4.0.5              
-#> [119] Rhdf5lib_1.23.0           KEGGREST_1.41.0          
-#> [121] statmod_1.5.0             memoise_2.0.1            
-#> [123] snpStats_1.51.0           bit_4.0.5
+#> [101] readr_2.1.4               cli_3.6.1                
+#> [103] compiler_4.3.1            Rsamtools_2.17.0         
+#> [105] rlang_1.1.1               crayon_1.5.2             
+#> [107] rngtools_1.5.2            nor1mix_1.3-0            
+#> [109] mclust_6.0.0              plyr_1.8.8               
+#> [111] stringi_1.7.12            BiocParallel_1.35.3      
+#> [113] munsell_0.5.0             PCAtools_2.13.0          
+#> [115] Matrix_1.6-1              BSgenome_1.69.0          
+#> [117] hms_1.1.3                 sparseMatrixStats_1.13.4 
+#> [119] bit64_4.0.5               ggplot2_3.4.3            
+#> [121] Rhdf5lib_1.23.0           KEGGREST_1.41.0          
+#> [123] statmod_1.5.0             memoise_2.0.1            
+#> [125] snpStats_1.51.0           bit_4.0.5
 ```

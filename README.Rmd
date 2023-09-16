@@ -39,7 +39,7 @@ vignette: >
             - 3.5.3.2 [Convert to GenomicRanges and Find
             Overlaps](#convert-to-genomicranges-and-find-overlaps)
         - 3.5.4 [Summarizing Gene Regions with Regional Principal
-        Components](#summarizing-gene-regions-with-regional-principal-components)
+        Components](#summarizing-gene-regions)
             - 3.5.4.1 [Compute Regional PCs](#compute-regional-pcs)
             - 3.5.4.2 [Inspecting the Output](#inspecting-the-output)
             - 3.5.4.3 [Extracting and Viewing Regional
@@ -105,7 +105,10 @@ library(RNOmni)
 library(GenomicRanges)
 library(IlluminaHumanMethylation450kanno.ilmn12.hg19)
 library(liftOver)
-library(tidyverse)
+library(magrittr)
+library(tidyr)
+library(tibble)
+library(dplyr)
 ```
 
 Here, we load the regionalpcs package, which is the main package we’ll be 
@@ -194,7 +197,9 @@ head(new_cpg_df)
 ### Addressing Genome Build Discrepancies
 It's critical to ensure that the genome builds match across datasets. In this 
 example, we'll use the `GenomicRanges` and `liftOver` packages to convert the 
-genomic positions from hg19 to hg38. Here’s a quick example on how to lift over positions from one build to another. **Always ensure that you are working with the correct genome build and that the build matches across all your datasets, or else you will run into big issues!**
+genomic positions from hg19 to hg38. Here’s a quick example on how to lift over positions from one build to another. **Always ensure that you are working with 
+the correct genome build and that the build matches across all your datasets, 
+or else you will run into big issues!**
 
 We need a chain file to lift the genomic positions. The chain file is an
 annotation file that links the positions between the genome builds. You can
@@ -214,9 +219,11 @@ hg19_pos <- new_cpg_df %>%
 hg19_pos_gr <- makeGRangesFromDataFrame(hg19_pos, keep.extra.columns = TRUE)
 
 # Load chain file and liftOver positions
-chain_file <- system.file("extdata", "hg19toHg38.over.chain",
+chain_file <- system.file("extdata", "hg19ToHg38.over.chain",
     package = "regionalpcs"
 )
+print(paste("Using chain file for liftOver", chain_file))
+print(file.exists(chain_file))
 chain <- import.chain(chain_file)
 
 hg38_pos <- liftOver(hg19_pos_gr, chain) %>%
@@ -350,7 +357,10 @@ With these steps, you'll have a region map that assigns CpGs to specific gene
 regions, which can be essential for downstream analyses.
 
 
+<a name="summarizing-gene-regions"></a>
+
 ### Summarizing Gene Regions with Regional Principal Components
+
 
 In this final section, we'll summarize gene regions using Principal 
 Components (PCs) to capture the maximum variation. We'll utilize the
@@ -399,8 +409,8 @@ on a gene regional PC scale. We can feed these into downstream analyses as is.
 
 The number of regional PCs representing each gene region was determined by the
 Gavish-Donoho method. This method allows us to identify PCs that capture actual 
-signal in our data and not the noise that is inherent in any dataset. To explore
-alternative methods, we can change the `pc_method` parameter.
+signal in our data and not the noise that is inherent in any dataset. 
+To explore alternative methods, we can change the `pc_method` parameter.
 
 
 ```{r count-pcs-regions}
