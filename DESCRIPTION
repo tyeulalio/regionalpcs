@@ -1,6 +1,6 @@
 Package: regionalpcs
 Title: Summarizing Regional Methylation with Regional Principal Components Analysis
-Version: 0.99.2
+Version: 0.99.3
 Authors@R: 
     person("Tiffany", "Eulalio", , "tyeulalio@gmail.com", 
            role = c("aut", "cre"), 
@@ -26,20 +26,19 @@ biocViews:
     MethylationArray
 Imports: 
     dplyr, 
-    magrittr, 
     PCAtools, 
-    tibble
+    tibble,
+    GenomicRanges
 Suggests: 
-    GenomicRanges, 
-    IlluminaHumanMethylation450kanno.ilmn12.hg19, 
     knitr, 
-    liftOver, 
     rmarkdown, 
     RMTstat,
-    RNOmni,
     testthat (>= 3.0.0), 
     BiocStyle,
-    tidyr
+    tidyr,
+    minfiData,
+    TxDb.Hsapiens.UCSC.hg19.knownGene,
+    IRanges
 Config/testthat/edition: 3
 VignetteBuilder: knitr
 Depends: 

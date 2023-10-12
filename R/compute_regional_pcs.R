@@ -27,14 +27,14 @@
 #' compute_regional_pcs(meth_data, region_map_data, pc_method = 'gd')
 #'
 compute_regional_pcs <- function(meth, region_map,
-                                pc_method = 'gd', verbose = FALSE) {
+    pc_method = c('gd', 'mp'), verbose = FALSE) {
     # Perform input checks
     stopifnot(length(intersect(rownames(meth), region_map[, 2])) > 0)
-    stopifnot(pc_method %in% c('gd', 'mp'))
+    pc_method <- match.arg(pc_method) # matching argument
     if (pc_method == "gd") {
-    message("Using Gavish-Donoho method")
+        message("Using Gavish-Donoho method")
     } else {
-    message("Using Marchenko-Pastur method")
+        message("Using Marchenko-Pastur method")
     }
 
     # Set column names for region_map
@@ -50,14 +50,12 @@ compute_regional_pcs <- function(meth, region_map,
     region_res <- lapply(
         regions, summarize_region, region_map,
         meth, pc_method, verbose
-        )
+    )
 
     # Combine results into data frames
     region_pcs <- do.call(rbind, lapply(region_res, combine_results, 'sig_pcs'))
     region_pct_var <- do.call(rbind,
-    lapply(region_res,
-        combine_results,
-        'percent_var'))
+        lapply(region_res, combine_results, 'percent_var'))
 
     # Combine loadings into one list
     region_loadings <- lapply(region_res, function(x) x$loadings)
@@ -89,7 +87,7 @@ compute_regional_pcs <- function(meth, region_map,
 #'
 #' @examples
 #' # Create example data for 'sig_pcs' and 'percent_var'
-#' sig_pcs_example <- data.frame(pcs = c("PC1", "PC2"),
+#'     sig_pcs_example <- data.frame(pcs = c("PC1", "PC2"),
 #' value = c(0.2, 0.4))
 #' percent_var_example <- data.frame(pcs = c("PC1", "PC2"),
 #' value = c(0.7, 0.3))
@@ -104,11 +102,11 @@ compute_regional_pcs <- function(meth, region_map,
 combine_results <- function(res, df_name) {
     .data <- dplyr::`.data`
     # Transform and format data frame according to df_name
-    formatted_df <- res[[df_name]] %>%
-        t() %>%
-        as.data.frame() %>%
-        tibble::rownames_to_column('pc') %>%
-        dplyr::mutate(pc = paste(res$region, .data$pc, sep = '-')) %>%
+    formatted_df <- res[[df_name]] |>
+        t() |>
+        as.data.frame() |>
+        tibble::rownames_to_column('pc') |>
+        dplyr::mutate(pc = paste(res$region, .data$pc, sep = '-')) |>
         tibble::column_to_rownames('pc')
 
     return(formatted_df)
@@ -144,7 +142,7 @@ combine_results <- function(res, df_name) {
 #' # Call the function
 #' summarize_region(1, region_map, meth, 'gd')
 summarize_region <- function(region, region_map,
-                            meth, pc_method, verbose = FALSE) {
+                                meth, pc_method, verbose = FALSE) {
 
     # Output processing message if verbose is TRUE
     if (verbose) {
@@ -152,7 +150,7 @@ summarize_region <- function(region, region_map,
     }
     .data <- dplyr::`.data`
     # Filter CpGs for the given region
-    region_cpgs <- region_map %>%
+    region_cpgs <- region_map |>
         dplyr::filter(.data$region_id == region)
 
     # Subset methylation data to CpGs in the region
@@ -162,7 +160,7 @@ summarize_region <- function(region, region_map,
     num_cpgs <- nrow(region_meth)
 
     # Get significant PCs for this region
-    pc_res <- get_sig_pcs(region_meth, method = pc_method, verbose)
+    pc_res <- get_sig_pcs(region_meth, pc_method = pc_method, verbose)
 
     # Add metadata to the result
     pc_res$num_cpgs <- num_cpgs

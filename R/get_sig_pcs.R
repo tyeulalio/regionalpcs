@@ -2,7 +2,7 @@
 #'
 #' @param x A data frame or matrix of methylation values;
 #' rows = features, columns = samples
-#' @param method String indicating the method for estimating dimension;
+#' @param pc_method String indicating the method for estimating dimension;
 #' "gd" = Gavish-Donoho (default), "mp" = Marchenko-Pastur
 #' @param verbose Boolean; print output statements
 #'
@@ -11,15 +11,14 @@
 #' percent_var = percent variance explained,
 #' loadings = PC loadings,
 #' est_dim = estimated dimension
-#' @importFrom magrittr %>%
 #' @export
 #'
 #' @examples
 #' x <- diag(4)
 #' get_sig_pcs(x, "gd")
-get_sig_pcs <- function(x, method = "gd", verbose = FALSE) {
+get_sig_pcs <- function(x, pc_method = c("mp", "gd"), verbose = FALSE) {
     # Check input validity
-    stopifnot(method %in% c("gd", "mp"))
+    pc_method <- match.arg(pc_method)
     stopifnot(is.data.frame(x) | is.matrix(x))
 
     # Compute PCs using PCAtools package
@@ -32,7 +31,7 @@ get_sig_pcs <- function(x, method = "gd", verbose = FALSE) {
     noise_select <- 1
 
     # Compute significant dimensions
-    dims_res <- compute_dimension(x, eig_sq, noise_select, method)
+    dims_res <- compute_dimension(x, eig_sq, noise_select, pc_method)
 
     # Extract rotated PCs and loadings
     pcs <- pca_res$rotated
@@ -42,18 +41,18 @@ get_sig_pcs <- function(x, method = "gd", verbose = FALSE) {
     est_dim <- dims_res[[1]]
 
     # Filter significant PCs
-    sig_pcs <- pcs[, seq_len(est_dim), drop = FALSE] %>%
+    sig_pcs <- pcs[, seq_len(est_dim), drop = FALSE] |>
         as.data.frame()
 
     # Filter significant loadings
-    sig_loads <- loads[, seq_len(est_dim), drop = FALSE] %>%
+    sig_loads <- loads[, seq_len(est_dim), drop = FALSE] |>
         as.data.frame()
 
     # Compute percent variance explained
     pct_var <- eig_sq / sum(eig_sq)
     subset_pct_var <- data.frame(
-        percent_variance_explained = pct_var[seq_len(est_dim)]) %>%
-        t() %>%
+        percent_variance_explained = pct_var[seq_len(est_dim)]) |>
+        t() |>
         as.data.frame()
 
     names(subset_pct_var) <- names(sig_pcs)
@@ -98,19 +97,19 @@ compute_dimension <- function(x, var_explained, noise_select,
 
     # Select method for dimension estimation
     if (method == "gd") {
-    if (verbose) message("Using Gavish-Donoho method")
-        dims_res <- PCAtools::chooseGavishDonoho(x,
-            var.explained = var_explained,
-            noise = noise_select
-            )
+        if (verbose) message("Using Gavish-Donoho method")
+            dims_res <- PCAtools::chooseGavishDonoho(x,
+                var.explained = var_explained,
+                noise = noise_select
+                )
     }
 
     if (method == "mp") {
-    if (verbose) message("Using Marchenko-Pastur method")
-        dims_res <- PCAtools::chooseMarchenkoPastur(x,
-            var.explained = var_explained,
-            noise = noise_select
-            )
+        if (verbose) message("Using Marchenko-Pastur method")
+            dims_res <- PCAtools::chooseMarchenkoPastur(x,
+                var.explained = var_explained,
+                noise = noise_select
+                )
     }
 
     # Return computed dimensions

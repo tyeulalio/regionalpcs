@@ -4,13 +4,13 @@
 \alias{get_sig_pcs}
 \title{Get significant principal components}
 \usage{
-get_sig_pcs(x, method = "gd", verbose = FALSE)
+get_sig_pcs(x, pc_method = c("mp", "gd"), verbose = FALSE)
 }
 \arguments{
 \item{x}{A data frame or matrix of methylation values;
 rows = features, columns = samples}
 
-\item{method}{String indicating the method for estimating dimension;
+\item{pc_method}{String indicating the method for estimating dimension;
 "gd" = Gavish-Donoho (default), "mp" = Marchenko-Pastur}
 
 \item{verbose}{Boolean; print output statements}
