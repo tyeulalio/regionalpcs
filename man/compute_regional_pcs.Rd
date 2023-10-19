@@ -4,7 +4,12 @@
 \alias{compute_regional_pcs}
 \title{Compute regional principal components for methylation data}
 \usage{
-compute_regional_pcs(meth, region_map, pc_method = "gd", verbose = FALSE)
+compute_regional_pcs(
+  meth,
+  region_map,
+  pc_method = c("gd", "mp"),
+  verbose = FALSE
+)
 }
 \arguments{
 \item{meth}{Data frame of methylation beta values,
