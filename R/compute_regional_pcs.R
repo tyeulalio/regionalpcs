@@ -31,11 +31,13 @@ compute_regional_pcs <- function(meth, region_map,
     # Perform input checks
     stopifnot(length(intersect(rownames(meth), region_map[, 2])) > 0)
     pc_method <- match.arg(pc_method) # matching argument
-    if (pc_method == "gd") {
-        message("Using Gavish-Donoho method")
-    } else {
-        message("Using Marchenko-Pastur method")
-    }
+    # output method being used for user
+    msg <- switch(
+        pc_method,
+        gd = "Using Gavish-Donoho method",
+        mp = "Using Marchenko-Pastur method"
+    )
+    message(msg)
 
     # Set column names for region_map
     colnames(region_map)[seq_len(2)] <- c('region_id', 'cpg_id')
@@ -143,7 +145,6 @@ combine_results <- function(res, df_name) {
 #' summarize_region(1, region_map, meth, 'gd')
 summarize_region <- function(region, region_map,
                                 meth, pc_method, verbose = FALSE) {
-
     # Output processing message if verbose is TRUE
     if (verbose) {
         message("Processing ", region)

@@ -76,8 +76,8 @@ get_sig_pcs <- function(x, pc_method = c("mp", "gd"), verbose = FALSE) {
 #' sorted in decreasing order. (Used for PCAtools)
 #' @param noise_select Numeric scalar specifying the
 #' variance of the random noise (Used for PCAtools)
-#' @param method String indicating the method for estimating dimension;
-#' "gd" = Gavish-Donoho (default), "mp" = Marchenko-Pastur
+#' @param pc_method String indicating the method for estimating dimension;
+#' "gd" = Gavish-Donoho, "mp" = Marchenko-Pastur
 #' @param verbose Boolean indicating whether to print
 #' statements while running, default = FALSE
 #'
@@ -91,26 +91,22 @@ get_sig_pcs <- function(x, pc_method = c("mp", "gd"), verbose = FALSE) {
 #' eig_sq <- pca_res$sdev^2 # Compute variance explained
 #' compute_dimension(x, eig_sq, 1, "gd")
 compute_dimension <- function(x, var_explained, noise_select,
-                                method, verbose = FALSE) {
+        pc_method = c('gd', 'mp'), verbose = FALSE) {
     # Initialize result variable
     dims_res <- NA
 
     # Select method for dimension estimation
-    if (method == "gd") {
-        if (verbose) message("Using Gavish-Donoho method")
-            dims_res <- PCAtools::chooseGavishDonoho(x,
-                var.explained = var_explained,
-                noise = noise_select
-                )
-    }
+    pc_method <- match.arg(pc_method)
+    FUN <- switch(
+        pc_method,
+        gd = PCAtools::chooseGavishDonoho,
+        mp = PCAtools::chooseMarchenkoPastur
+    )
 
-    if (method == "mp") {
-        if (verbose) message("Using Marchenko-Pastur method")
-            dims_res <- PCAtools::chooseMarchenkoPastur(x,
-                var.explained = var_explained,
-                noise = noise_select
-                )
-    }
+    # estimate dimensions
+    dims_res <- FUN(x,
+        var.explained = var_explained,
+        noise = noise_select)
 
     # Return computed dimensions
     return(dims_res)

@@ -5,7 +5,13 @@
 \title{Compute significant dimensions of a matrix
 using the Marchenko-Pastur or Gavish-Donoho methods}
 \usage{
-compute_dimension(x, var_explained, noise_select, method, verbose = FALSE)
+compute_dimension(
+  x,
+  var_explained,
+  noise_select,
+  pc_method = c("gd", "mp"),
+  verbose = FALSE
+)
 }
 \arguments{
 \item{x}{A data frame or matrix of methylation values;
@@ -18,8 +24,8 @@ sorted in decreasing order. (Used for PCAtools)}
 \item{noise_select}{Numeric scalar specifying the
 variance of the random noise (Used for PCAtools)}
 
-\item{method}{String indicating the method for estimating dimension;
-"gd" = Gavish-Donoho (default), "mp" = Marchenko-Pastur}
+\item{pc_method}{String indicating the method for estimating dimension;
+"gd" = Gavish-Donoho, "mp" = Marchenko-Pastur}
 
 \item{verbose}{Boolean indicating whether to print
 statements while running, default = FALSE}

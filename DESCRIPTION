@@ -1,6 +1,6 @@
 Package: regionalpcs
 Title: Summarizing Regional Methylation with Regional Principal Components Analysis
-Version: 0.99.3
+Version: 0.99.4
 Authors@R: 
     person("Tiffany", "Eulalio", , "tyeulalio@gmail.com", 
            role = c("aut", "cre"), 
