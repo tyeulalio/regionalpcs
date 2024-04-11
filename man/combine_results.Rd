@@ -20,7 +20,7 @@ Combine results dataframes across regions
 }
 \examples{
 # Create example data for 'sig_pcs' and 'percent_var'
-sig_pcs_example <- data.frame(pcs = c("PC1", "PC2"),
+    sig_pcs_example <- data.frame(pcs = c("PC1", "PC2"),
 value = c(0.2, 0.4))
 percent_var_example <- data.frame(pcs = c("PC1", "PC2"),
 value = c(0.7, 0.3))
