@@ -1,6 +1,6 @@
 Package: regionalpcs
 Title: Summarizing Regional Methylation with Regional Principal Components Analysis
-Version: 0.99.2
+Version: 0.99.4
 Authors@R: 
     person("Tiffany", "Eulalio", , "tyeulalio@gmail.com", 
            role = c("aut", "cre"), 
@@ -16,7 +16,7 @@ License: MIT + file LICENSE
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.2.3
-URL: https://github.com/tyeulalio/regionalpcs
+URL: https://github.com/tyeulalio/regionalpcs, https://tyeulalio.github.io/regionalpcs/
 BugReports: https://github.com/tyeulalio/regionalpcs/issues
 biocViews: 
     DNAMethylation, 
@@ -26,20 +26,19 @@ biocViews:
     MethylationArray
 Imports: 
     dplyr, 
-    magrittr, 
     PCAtools, 
-    tibble
+    tibble,
+    GenomicRanges
 Suggests: 
-    GenomicRanges, 
-    IlluminaHumanMethylation450kanno.ilmn12.hg19, 
     knitr, 
-    liftOver, 
     rmarkdown, 
     RMTstat,
-    RNOmni,
     testthat (>= 3.0.0), 
     BiocStyle,
-    tidyr
+    tidyr,
+    minfiData,
+    TxDb.Hsapiens.UCSC.hg19.knownGene,
+    IRanges
 Config/testthat/edition: 3
 VignetteBuilder: knitr
 Depends: 
