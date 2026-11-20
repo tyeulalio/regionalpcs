@@ -12,10 +12,14 @@ compute_regional_pcs(
 )
 }
 \arguments{
-\item{meth}{Data frame of methylation beta values,
-with CpGs in rows and samples in columns}
+\item{meth}{Numeric matrix or data frame of methylation values,
+with uniquely named CpGs in rows and samples in columns. Values must be
+finite. The input scale affects dimension selection; see the vignette.}
 
-\item{region_map}{Data frame mapping CpGs to gene regions}
+\item{region_map}{Data frame mapping CpGs to regions. The first two columns
+contain region IDs and CpG IDs, respectively. All mapped CpGs must occur in
+the row names of \code{meth}. Region and within-region CpG order are preserved,
+including repeated mappings.}
 
 \item{pc_method}{Method to use for PC computation,
 either 'gd' (Gavish-Donoho) or 'mp' (Marchenko-Pastur)}
@@ -23,8 +27,10 @@ either 'gd' (Gavish-Donoho) or 'mp' (Marchenko-Pastur)}
 \item{verbose}{Logical, should progress messages be displayed?}
 }
 \value{
-A list containing several elements,
-including the regional PCs, percent variance, and other information
+A list with \code{regional_pcs} (retained PCs by samples),
+\code{percent_variance} (fractions of within-region variance, not percentages),
+\code{loadings} (a named list of CpG-by-PC data frames), and \code{info}
+(a metadata matrix with region, estimated dimension, and CpG count).
 }
 \description{
 Compute regional principal components for methylation data

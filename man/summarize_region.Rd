@@ -12,14 +12,15 @@ summarize_region(region, region_map, meth, pc_method, verbose = FALSE)
 \item{region_map}{Data frame;
 Mapping of CpGs to regions,
 column 1 should be regions,
-column 2 should be CpGs with the same names as the rows of meth}
+column 2 should be CpGs with the same names as the rows of meth.
+Column names are ignored; all mapped CpGs must occur in meth.}
 
 \item{meth}{Data frame or matrix;
 Methylation values to summarize; rows=CpGs, columns=samples}
 
 \item{pc_method}{String;
 indicating the method for estimating dimension;
-"gd"=Gavish-Donoho (default), "mp"=Marchenko-Pastur}
+"gd"=Gavish-Donoho, "mp"=Marchenko-Pastur}
 
 \item{verbose}{Boolean; print output statements}
 }

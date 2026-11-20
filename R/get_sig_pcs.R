@@ -3,7 +3,7 @@
 #' @param x A data frame or matrix of methylation values;
 #' rows = features, columns = samples
 #' @param pc_method String indicating the method for estimating dimension;
-#' "gd" = Gavish-Donoho (default), "mp" = Marchenko-Pastur
+#' "gd" = Gavish-Donoho, "mp" = Marchenko-Pastur (default for this helper)
 #' @param verbose Boolean; print output statements
 #'
 #' @return List containing four elements;
@@ -83,6 +83,7 @@ get_sig_pcs <- function(x, pc_method = c("mp", "gd"), verbose = FALSE) {
 #'
 #' @return Numeric scalar representing the optimal
 #' number of PCs to retain using the specified method
+#' @importFrom RMTstat qmp
 #' @export
 #'
 #' @examples
@@ -97,6 +98,9 @@ compute_dimension <- function(x, var_explained, noise_select,
 
     # Select method for dimension estimation
     pc_method <- match.arg(pc_method)
+    if (pc_method == "mp" && !requireNamespace("RMTstat", quietly = TRUE)) {
+        stop("Marchenko-Pastur selection requires the RMTstat package.")
+    }
     FUN <- switch(
         pc_method,
         gd = PCAtools::chooseGavishDonoho,
