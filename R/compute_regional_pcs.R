@@ -1,14 +1,20 @@
 #' Compute regional principal components for methylation data
 #'
-#' @param meth Data frame of methylation beta values,
-#' with CpGs in rows and samples in columns
-#' @param region_map Data frame mapping CpGs to gene regions
+#' @param meth Numeric matrix or data frame of methylation values,
+#' with uniquely named CpGs in rows and samples in columns. Values must be
+#' finite. The input scale affects dimension selection; see the vignette.
+#' @param region_map Data frame mapping CpGs to regions. The first two columns
+#' contain region IDs and CpG IDs, respectively. All mapped CpGs must occur in
+#' the row names of `meth`. Region and within-region CpG order are preserved,
+#' including repeated mappings.
 #' @param pc_method Method to use for PC computation,
 #' either 'gd' (Gavish-Donoho) or 'mp' (Marchenko-Pastur)
 #' @param verbose Logical, should progress messages be displayed?
 #'
-#' @return A list containing several elements,
-#' including the regional PCs, percent variance, and other information
+#' @return A list with `regional_pcs` (retained PCs by samples),
+#' `percent_variance` (fractions of within-region variance, not percentages),
+#' `loadings` (a named list of CpG-by-PC data frames), and `info`
+#' (a metadata matrix with region, estimated dimension, and CpG count).
 #' @export
 #'
 #' @examples
@@ -28,10 +34,8 @@
 #'
 compute_regional_pcs <- function(meth, region_map,
     pc_method = c('gd', 'mp'), verbose = FALSE) {
-    # Perform input checks
-    stopifnot(length(intersect(rownames(meth), region_map[, 2])) > 0)
-    pc_method <- match.arg(pc_method) # matching argument
-    # output method being used for user
+    region_map <- .prepare_region_map(meth, region_map)
+    pc_method <- match.arg(pc_method)
     msg <- switch(
         pc_method,
         gd = "Using Gavish-Donoho method",
@@ -39,36 +43,30 @@ compute_regional_pcs <- function(meth, region_map,
     )
     message(msg)
 
-    # Set column names for region_map
-    colnames(region_map)[seq_len(2)] <- c('region_id', 'cpg_id')
-    region_map$region_id <- as.character(region_map$region_id)
-
-    # Get the unique regions
     regions <- unique(region_map[['region_id']])
     num_regions <- length(regions)
     if (verbose) message("Number of regions:", num_regions)
 
-    # Summarize each of the region types
-    region_res <- lapply(
-        regions, summarize_region, region_map,
-        meth, pc_method, verbose
-    )
+    # Group indices once, retaining region order and repeated mappings.
+    row_indices <- match(region_map$cpg_id, rownames(meth))
+    region_rows <- split(row_indices,
+        factor(region_map$region_id, levels = regions))
+    region_res <- lapply(seq_along(regions), function(i) {
+        .summarize_region_rows(regions[[i]], region_rows[[i]],
+            meth, pc_method, verbose)
+    })
 
-    # Combine results into data frames
     region_pcs <- do.call(rbind, lapply(region_res, combine_results, 'sig_pcs'))
     region_pct_var <- do.call(rbind,
         lapply(region_res, combine_results, 'percent_var'))
 
-    # Combine loadings into one list
     region_loadings <- lapply(region_res, function(x) x$loadings)
     names(region_loadings) <- regions
 
-    # Combine the other information
     region_info <- do.call(
         rbind,
         lapply(region_res, function(x) x[c('region', 'est_dim', 'num_cpgs')])
         )
-    # Return all results in a list
     return(list(
         regional_pcs = region_pcs,
         percent_variance = region_pct_var,
@@ -102,15 +100,11 @@ compute_regional_pcs <- function(meth, region_map,
 #' combined_sig_pcs <- combine_results(res, df_name = "sig_pcs")
 #' print(combined_sig_pcs)
 combine_results <- function(res, df_name) {
-    .data <- dplyr::`.data`
-    # Transform and format data frame according to df_name
-    formatted_df <- res[[df_name]] |>
-        t() |>
-        as.data.frame() |>
-        tibble::rownames_to_column('pc') |>
-        dplyr::mutate(pc = paste(res$region, .data$pc, sep = '-')) |>
-        tibble::column_to_rownames('pc')
-
+    formatted_df <- as.data.frame(t(res[[df_name]]))
+    if (nrow(formatted_df) > 0L) {
+        rownames(formatted_df) <- paste(res$region,
+            rownames(formatted_df), sep = '-')
+    }
     return(formatted_df)
 }
 
@@ -123,10 +117,11 @@ combine_results <- function(res, df_name) {
 #' @param region_map Data frame;
 #' Mapping of CpGs to regions,
 #' column 1 should be regions,
-#' column 2 should be CpGs with the same names as the rows of meth
+#' column 2 should be CpGs with the same names as the rows of meth.
+#' Column names are ignored; all mapped CpGs must occur in meth.
 #' @param pc_method String;
 #' indicating the method for estimating dimension;
-#' "gd"=Gavish-Donoho (default), "mp"=Marchenko-Pastur
+#' "gd"=Gavish-Donoho, "mp"=Marchenko-Pastur
 #' @param verbose Boolean; print output statements
 #'
 #' @return list containing PC results
@@ -145,27 +140,60 @@ combine_results <- function(res, df_name) {
 #' summarize_region(1, region_map, meth, 'gd')
 summarize_region <- function(region, region_map,
                                 meth, pc_method, verbose = FALSE) {
-    # Output processing message if verbose is TRUE
+    region_map <- .prepare_region_map(meth, region_map)
+    pc_method <- match.arg(pc_method, c('gd', 'mp'))
+    rows <- match(region_map$cpg_id[region_map$region_id == region],
+        rownames(meth))
+    if (length(rows) == 0L) {
+        stop("No CpGs are mapped to the requested region.")
+    }
+    .summarize_region_rows(region, rows, meth, pc_method, verbose)
+}
+
+.summarize_region_rows <- function(region, rows, meth, pc_method, verbose) {
     if (verbose) {
         message("Processing ", region)
     }
-    .data <- dplyr::`.data`
-    # Filter CpGs for the given region
-    region_cpgs <- region_map |>
-        dplyr::filter(.data$region_id == region)
+    # Subset before conversion to avoid copying the full matrix.
+    region_meth <- as.data.frame(meth[rows, , drop = FALSE])
 
-    # Subset methylation data to CpGs in the region
-    region_meth <- as.data.frame(meth)[region_cpgs$cpg_id, , drop = FALSE]
-
-    # Get number of CpGs
     num_cpgs <- nrow(region_meth)
 
-    # Get significant PCs for this region
     pc_res <- get_sig_pcs(region_meth, pc_method = pc_method, verbose)
 
-    # Add metadata to the result
     pc_res$num_cpgs <- num_cpgs
     pc_res$region <- region
 
     return(pc_res)
+}
+
+.prepare_region_map <- function(meth, region_map) {
+    if (!(is.matrix(meth) || is.data.frame(meth)) ||
+        (is.matrix(meth) && !is.numeric(meth)) ||
+        (is.data.frame(meth) && !all(vapply(meth, is.numeric, logical(1))))) {
+        stop("'meth' must be a numeric matrix or data frame.")
+    }
+    if (nrow(meth) == 0L || ncol(meth) < 2L) {
+        stop("'meth' must contain at least one CpG and two samples.")
+    }
+    ids <- rownames(meth)
+    if (is.null(ids) || anyNA(ids) || any(!nzchar(ids)) || anyDuplicated(ids)) {
+        stop("'meth' must have unique, non-missing CpG row names.")
+    }
+    if (!is.data.frame(region_map) || ncol(region_map) < 2L ||
+        nrow(region_map) == 0L) {
+        stop("'region_map' must be a non-empty data frame with two columns.")
+    }
+    region_map <- as.data.frame(region_map[, seq_len(2), drop = FALSE])
+    names(region_map) <- c('region_id', 'cpg_id')
+    region_map[] <- lapply(region_map, as.character)
+    if (anyNA(region_map) || any(!nzchar(region_map$region_id)) ||
+        any(!nzchar(region_map$cpg_id))) {
+        stop("'region_map' IDs must be non-missing and non-empty.")
+    }
+    if (anyNA(match(region_map$cpg_id, ids))) {
+        stop("All CpGs in 'region_map' must occur in rownames(meth). ",
+            "Filter the map to the measured CpGs before computing PCs.")
+    }
+    region_map
 }

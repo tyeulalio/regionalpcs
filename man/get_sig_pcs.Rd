@@ -11,7 +11,7 @@ get_sig_pcs(x, pc_method = c("mp", "gd"), verbose = FALSE)
 rows = features, columns = samples}
 
 \item{pc_method}{String indicating the method for estimating dimension;
-"gd" = Gavish-Donoho (default), "mp" = Marchenko-Pastur}
+"gd" = Gavish-Donoho, "mp" = Marchenko-Pastur (default for this helper)}
 
 \item{verbose}{Boolean; print output statements}
 }

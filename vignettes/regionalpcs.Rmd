@@ -1,346 +1,235 @@
 ---
-title: "regionalpcs"
+title: "Summarizing methylation with regional principal components"
 author: "Tiffany Eulalio"
 output: BiocStyle::html_document
 vignette: >
-  %\VignetteIndexEntry{regionalpcs}
+  %\VignetteIndexEntry{regionalpcs: Regional principal components}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
 
-```{r, include = FALSE}
-knitr::opts_chunk$set(
-    collapse = TRUE,
-    comment = "#>",
-    echo = TRUE
-)
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
 ```
 
-# regionalpcs
+# Overview
 
-Navigating the complexity of DNA methylation data poses substantial challenges 
-due to its intricate biological patterns. The `regionalpcs` package is 
-conceived to address the substantial need for enhanced summarization and 
-interpretation at a regional level. Traditional methodologies, while 
-foundational, may not fully encapsulate the biological nuances of methylation 
-patterns, thereby potentially yielding interpretations that may be suboptimal 
-or veer towards inaccuracies. This package introduces and utilizes regional 
-principal components (rPCs), designed to adeptly capture biologically relevant 
-signals embedded within DNA methylation data. Through the implementation of 
-rPCs, researchers can gain new insights into complex interactions and 
-effects in methylation data that might otherwise be missed.
+`regionalpcs` applies principal components analysis separately within each
+user-defined genomic region. Each retained component provides a score for each
+sample, summarizing a pattern of covariation among that region's CpGs. Regions
+can be promoters, gene bodies, enhancers, or other intervals of interest.
 
-
+The loadings describe each CpG's contribution to a regional PC. CpGs with
+opposite loadings contribute in opposite directions, so a regional PC can
+capture patterns that are lost when methylation values are averaged.
 
 # Installation
 
-The `regionalpcs` package can be easily installed from Bioconductor, providing 
-you with the latest stable version suitable for general use. Alternatively, 
-for those interested in exploring or utilizing the latest features and 
-developments, the GitHub version can be installed directly.
+Install the release compatible with your R and Bioconductor versions:
 
-### Bioconductor Installation
-
-Install `regionalpcs` from Bioconductor using the command below. Ensure 
-that your R version is compatible with the package version available on 
-Bioconductor for smooth installation and functionality.
-
-```{r eval=FALSE}
-if (!requireNamespace("BiocManager", quietly=TRUE))
+```{r installation, eval=FALSE}
+if (!requireNamespace("BiocManager", quietly = TRUE)) {
     install.packages("BiocManager")
-
+}
 BiocManager::install("regionalpcs")
 ```
 
-### Development Version Installation
+The example below uses simulated M-values. An array-data example is included
+at the end of the vignette.
 
-To access the development version of `regionalpcs` directly from GitHub, 
-which might include new features or enhancements not yet available in the 
-Bioconductor version, use the following commands. Note that the development 
-version might be less stable than the officially released version.
-
-```{r eval=FALSE}
-# install devtools package if not already installed
-if (!requireNamespace("devtools", quietly=TRUE))
-    install.packages("devtools")
-
-# download and install the regionalpcs package
-devtools::install_github("tyeulalio/regionalpcs")
-```
-
-
-# `regionalpcs` R Package Tutorial 
-
-## Loading Required Packages
-This tutorial depends on several Bioconductor packages. These packages should 
-be loaded at the beginning of the analysis.
-
-```{r load-packages, message=FALSE, warning=FALSE}
+```{r packages}
 library(regionalpcs)
 library(GenomicRanges)
-library(tidyr)
-library(tibble)
-library(dplyr)
-library(minfiData)
-library(TxDb.Hsapiens.UCSC.hg19.knownGene)
 ```
 
+# Input data
 
-Let’s proceed to load the packages, briefly understanding their roles in 
-this tutorial.
+The methylation input is a numeric matrix or data frame with CpGs in rows and
+samples in columns. CpG row names must be unique. At least two samples are
+required. Values must be finite, and probe filtering should be completed before
+computing regional PCs. Constant CpGs should be removed; variance fractions are
+undefined for a region with no variation.
 
-- `regionalpcs`: Primary package for summarizing and interpreting DNA 
-methylation data at a regional level.
-  
-- `GenomicRanges`: Facilitates representation and manipulation of genomic 
-intervals and variables defined along a genome.
+Beta values are proportions on the 0--1 scale. M-values are log2 ratios of
+methylated to unmethylated signal and are on a different scale. The package does
+not transform values or standardize each CpG to unit variance. The input scale
+therefore affects the scores and the number of components retained.
 
-- `tidyr`, `tibble`, `dplyr`: Assist in data tidying, representation, 
-and manipulation.
+We simulate three regions with six CpGs each. CpGs within a region share a
+sample-level pattern, with independent noise added to each measurement.
 
-- `minfiData`: Provides example Illumina 450k data, aiding in the 
-demonstration of `regionalpcs` functionalities.
+```{r simulated-data}
+set.seed(2026)
+n_samples <- 40L
+n_regions <- 3L
+cpgs_per_region <- 6L
+n_cpgs <- n_regions * cpgs_per_region
+region_index <- rep(seq_len(n_regions), each = cpgs_per_region)
+latent <- matrix(rnorm(n_regions * n_samples), nrow = n_regions)
+mvals <- 2 * latent[region_index, ] +
+    matrix(rnorm(n_cpgs * n_samples, sd = 0.3), nrow = n_cpgs)
+rownames(mvals) <- paste0("cg", seq_len(n_cpgs))
+colnames(mvals) <- paste0("sample", seq_len(n_samples))
 
-- `TxDb.Hsapiens.UCSC.hg19.knownGene`: Accommodates transcriptome data, 
-useful for annotating results.
-
-
-Once the packages are loaded, we can start using the functions provided by each
-package.
-
-
-
-## Load the Dataset
-
-### Loading Minfi Sample Dataset
-
-In this tutorial, we’ll utilize a sample dataset, `MsetEx.sub`, which is a 
-subset derived from Illumina's Human Methylation 450k dataset, specifically
-preprocessed to contain 600 CpGs across 6 samples. The dataset is stored in a
-`MethylSet` object, which is commonly used to represent methylation data.
-
-The methylation beta values, denoting the proportion of methylated cytosines 
-at a particular CpG site, will be extracted from this dataset for our 
-subsequent analyses.
-
-```{r}
-# Load the MethylSet data
-data(MsetEx.sub)
-
-# Display the first few rows of the dataset for a preliminary view
-head(MsetEx.sub)
-
-# Extract methylation M-values from the MethylSet
-# M-values are logit-transformed beta-values and are often used in differential
-# methylation analysis for improved statistical performance.
-mvals <- getM(MsetEx.sub)
-
-# Display the extracted methylation beta values
-head(mvals)
+cpg_gr <- GRanges(
+    seqnames = "chr1",
+    ranges = IRanges(start = rep(c(1000, 2000, 3000), each = cpgs_per_region) +
+        rep(seq_len(cpgs_per_region), n_regions), width = 1)
+)
+names(cpg_gr) <- rownames(mvals)
+regions_gr <- GRanges(
+    seqnames = "chr1",
+    ranges = IRanges(start = c(1000, 2000, 3000), width = 100)
+)
+names(regions_gr) <- c("region-A", "region-B", "region-C")
 ```
 
-Note that `MsetEx.sub` provides a manageable slice of data that we can 
-utilize to illustrate the capabilities of `regionalpcs` without requiring 
-extensive computational resources. 
+For real genomic inputs, both `GRanges` objects must use the same genome build
+and compatible chromosome names. `create_region_map()` does not lift coordinates
+between builds. Name the CpG ranges with the same IDs used in the methylation
+matrix, and name the region ranges with your intended region IDs.
 
-Now that we have our dataset loaded and methylation values extracted, 
-let’s proceed with demonstrating the core functionalities of `regionalpcs`.
-
-
-## Obtaining Methylation Array Probe Positions
-
-### Load Illumina 450k Array Probe Positions
-
-In this step, we’ll obtain the genomic coordinates of the CpG sites in our 
-methylation dataset using the 450k array probe annotations using the `minfi`
-package.
-
-```{r genomic-positions}
-# Map the methylation data to genomic coordinates using the mapToGenome
-# function. This creates a GenomicMethylSet (gset) which includes genomic 
-# position information for each probe.
-gset <- mapToGenome(MsetEx.sub)
-
-# Display the GenomicMethylSet object to observe the structure and initial 
-# entries.
-gset
-
-# Convert the genomic position data into a GRanges object, enabling genomic 
-# range operations in subsequent analyses.
-# The GRanges object (cpg_gr) provides a versatile structure for handling 
-# genomic coordinates in R/Bioconductor.
-cpg_gr <- granges(gset)
-
-# Display the GRanges object for a preliminary view of the genomic coordinates.
-cpg_gr
-```
-
-
-## Summarizing Gene Region Types
-
-### Introduction
-Gene regions, which include functional segments such as promoters, gene bodies, 
-and intergenic regions, play pivotal roles in gene expression and regulation.
-Summarizing methylation patterns across these regions can provide insights 
-into potential gene regulatory mechanisms and associations with phenotypes 
-or disease states. Herein, we will delve into how to succinctly summarize 
-methylation data at these crucial genomic segments using the `regionalpcs` 
-package.
-
-### Load Gene Region Annotations
-First, let's load the gene region annotations. Make sure to align the genomic 
-builds of your annotations and methylation data.
-
-```{r}
-# Obtain promoter regions
-# The TxDb object 'txdb' facilitates the retrieval of transcript-based 
-# genomic annotations.
-txdb <- TxDb.Hsapiens.UCSC.hg19.knownGene
-
-# Extracting promoter regions with a defined upstream and downstream window. 
-# This GRanges object 'promoters_gr' will be utilized to map and summarize 
-# methylation data in promoter regions.
-promoters_gr <- suppressMessages(promoters(genes(txdb), 
-                                    upstream=1000, 
-                                    downstream=0))
-
-# Display the GRanges object containing the genomic coordinates of promoter 
-# regions.
-promoters_gr
-
-```
-
-### Create a Region Map
-
-Creating a region map, which systematically assigns CpGs to specific gene 
-regions, stands as a crucial precursor to gene-region summarization using the
-`regionalpcs` package. This mapping elucidates the physical positioning of 
-CpGs within particular gene regions, facilitating our upcoming endeavors to 
-comprehend how methylation varies across distinct genomic segments. We'll use 
-the `create_region_map` function from the `regionalpcs` package. This function
-takes two genomic ranges objects, `cpg_gr` contains CpG positions and `genes_gr`
-contains gene region positions. Make sure both positions are aligned to the 
-same genome build (e.g. GrCH37, CrCH38).
-
-```{r}
-# get the region map using the regionalpcs function
-region_map <- regionalpcs::create_region_map(cpg_gr=cpg_gr, 
-                                                genes_gr=promoters_gr)
-
-# Display the initial few rows of the region map.
+```{r region-map}
+region_map <- create_region_map(cpg_gr, regions_gr)
 head(region_map)
 ```
 
-**Note:** The second column of `region_map` must contain values matching the
-rownames of your methylation dataframe.
+The first two columns of a region map contain region IDs and CpG IDs,
+respectively. Column names are ignored. A map can also be supplied directly:
 
-
-### Summarizing Gene Regions with Regional Principal Components
-
-In this final section, we'll summarize gene regions using Principal 
-Components (PCs) to capture the maximum variation. We'll utilize the
-`compute_regional_pcs` function from the `regionalpcs` package for this.
-
-#### Compute Regional PCs
-Let's calculate the regional PCs using our gene regions for 
-demonstration purposes.
-
-```{r compute-regional-pcs}
-# Display head of region map
-head(region_map)
-dim(region_map)
-
-# Compute regional PCs
-res <- compute_regional_pcs(meth=mvals, region_map=region_map, pc_method="gd")
+```{r custom-map}
+custom_map <- data.frame(
+    region_id = names(regions_gr)[region_index],
+    cpg_id = rownames(mvals)
+)
 ```
 
-#### Inspecting the Output
-The function returns a list containing multiple elements. Let's first look at 
-what these elements are.
+A CpG can contribute to multiple overlapping regions. Repeated copies of the
+same region--CpG pair are also preserved and give that CpG repeated influence;
+remove accidental duplicate pairs before analysis. Regions are returned in
+first-occurrence order, and CpGs retain their order within each region.
 
-```{r inspect-output}
-# Inspect the output list elements
+All CpGs in the map must occur in the methylation input. If the map was created
+before probe filtering, explicitly restrict it to the measured probes:
+
+```{r filter-map}
+region_map <- region_map[region_map$cpg_id %in% rownames(mvals), , drop = FALSE]
+stopifnot(nrow(region_map) > 0L)
+```
+
+# Regional PCs
+
+```{r compute}
+res <- compute_regional_pcs(mvals, region_map, pc_method = "gd")
 names(res)
+res$info
 ```
 
-#### Extracting and Viewing Regional PCs
-The first element (`res$regional_pcs`) is a data frame containing the 
-calculated regional PCs.
+The output contains:
 
+| Element | Interpretation |
+|:--|:--|
+| `regional_pcs` | Retained PCs in rows, samples in columns. |
+| `percent_variance` | Within-region variance fractions, one row per PC. |
+| `loadings` | Named list of CpG-by-PC data frames, one per region. |
+| `info` | Metadata matrix: `region`, `est_dim`, and `num_cpgs`. |
 
-```{r extract-regional-pcs}
-# Extract regional PCs
-regional_pcs <- res$regional_pcs
-head(regional_pcs)[1:4]
+`percent_variance` contains fractions of total within-region variance; multiply
+by 100 for percentages. The `info` matrix combines region IDs and counts. The
+example below converts its columns to a data frame with explicit column types.
+
+```{r inspect}
+res$regional_pcs[, seq_len(4), drop = FALSE]
+100 * res$percent_variance
+res$loadings[["region-A"]]
+info <- data.frame(
+    region = as.character(unlist(res$info[, "region"])),
+    est_dim = as.integer(unlist(res$info[, "est_dim"])),
+    num_cpgs = as.integer(unlist(res$info[, "num_cpgs"]))
+)
+info
 ```
 
-#### Understanding the Results
-The output is a data frame with regional PCs for each region as rows and our
-samples as columns. This is our new representation of methylation values, now 
-on a gene regional PC scale. We can feed these into downstream analyses as is.
+Score row names have the form `region-ID-PC1`. Region IDs can themselves contain
+hyphens, so split at the final `-PC<number>` suffix if you need separate fields:
 
-The number of regional PCs representing each gene region was determined by the
-Gavish-Donoho method. This method allows us to identify PCs that capture actual 
-signal in our data and not the noise that is inherent in any dataset. To explore
-alternative methods, we can change the `pc_method` parameter.
-
-
-```{r count-pcs-regions}
-# Count the number of unique gene regions and PCs
-regions <- data.frame(gene_pc = rownames(regional_pcs)) |>
-    separate(gene_pc, into = c("gene", "pc"), sep = "-")
-head(regions)
-
-# number of genes that have been summarized
-length(unique(regions$gene))
-
-# how many of each PC did we get
-table(regions$pc)
+```{r score-identifiers}
+score_ids <- rownames(res$regional_pcs)
+score_key <- data.frame(
+    region = sub("-PC[0-9]+$", "", score_ids),
+    pc = sub("^.*-(PC[0-9]+)$", "\\1", score_ids)
+)
+score_key
 ```
-We have summarized each of our genes using just one PC. The number of PCs 
-depends on three main factors: the number of samples, the number of CpGs in 
-the gene region, and the noise in the methylation data.
 
-By default, the `compute_regional_pcs` function uses the Gavish-Donoho method.
-However, we can also use the Marcenko-Pasteur method by setting the `pc_method`
-parameter:
+PCA signs are arbitrary: simultaneously reversing a component's scores and
+loadings represents the same component. A positive PC score does not by itself
+mean higher average methylation. Interpret scores together with the loadings.
 
-```{r marcenko-pasteur-method}
-# Using Marcenko-Pasteur method
+# Component selection
+
+`compute_regional_pcs()` defaults to Gavish--Donoho (`"gd"`). Use `"mp"` for
+Marchenko--Pastur:
+
+```{r mp}
 mp_res <- compute_regional_pcs(mvals, region_map, pc_method = "mp")
-
-# select the regional pcs
-mp_regional_pcs <- mp_res$regional_pcs
-
-# separate the genes from the pc numbers
-mp_regions <- data.frame(gene_pc = rownames(mp_regional_pcs)) |>
-    separate(gene_pc, into = c("gene", "pc"), sep = "-")
-head(mp_regions)
-
-# number of genes that have been summarized
-length(unique(mp_regions$gene))
-
-# how many of each PC did we get
-table(mp_regions$pc)
+mp_res$info
 ```
 
-The Marcenko-Pasteur and the Gavish-Donoho methods are both based on Random 
-Matrix Theory, and they aim to identify the number of significant PCs that 
-capture the true signal in the data and not just the noise. However, these 
-methods differ in how they select the number of significant PCs. The 
-Marcenko-Pasteur method typically selects more PCs to represent a gene region 
-compared to the Gavish-Donoho method. This may be due to the different ways in 
-which the two methods estimate the noise level in the data.
+Both methods use eigenvalues (`sdev^2`) from `PCAtools::pca()`. CpGs are
+centered across samples but are not scaled to unit variance. The noise variance
+passed
+to both selection methods is fixed at 1. Regional noise is not estimated, and
+the threshold does not automatically adjust to a change in input scale.
+Beta values and M-values can therefore yield different retained dimensions.
 
-Ultimately, the choice between the two methods depends on the specific needs 
-and goals of the analysis. The Gavish-Donoho method tends to provide more 
-conservative results, while the Marcenko-Pasteur method may capture more of 
-the underlying signal in the data. Researchers should carefully consider 
-their objectives and the characteristics of their data when selecting a method.
+The PCAtools selection routines retain at least one component, including when
+no eigenvalue exceeds the threshold. Retention is therefore not a significance
+test. The number of CpGs and samples also limits the regional dimension;
+a single-CpG region has only one component.
 
+# Array data
 
-# Session Information
+The following example uses M-values from `minfiData` and hg19 promoter regions.
+It requires additional annotation packages and is not evaluated when this
+vignette is built.
 
-```{r sessionInfo}
+```{r array-example, eval=FALSE}
+BiocManager::install(c("minfi", "minfiData", "GenomicFeatures",
+    "TxDb.Hsapiens.UCSC.hg19.knownGene"))
+data("MsetEx.sub", package = "minfiData")
+array_mvals <- minfi::getM(MsetEx.sub)
+gset <- minfi::mapToGenome(MsetEx.sub)
+array_cpgs <- GenomicRanges::granges(gset)
+txdb <- TxDb.Hsapiens.UCSC.hg19.knownGene::TxDb.Hsapiens.UCSC.hg19.knownGene
+promoters_gr <- GenomicRanges::promoters(GenomicFeatures::genes(txdb),
+    upstream = 1000, downstream = 0)
+array_map <- create_region_map(array_cpgs, promoters_gr)
+array_map <- array_map[
+    array_map$cpg_id %in% rownames(array_mvals), , drop = FALSE]
+array_res <- compute_regional_pcs(array_mvals, array_map, pc_method = "gd")
+```
+
+# Downstream analysis
+
+Transpose `res$regional_pcs` when a downstream model expects samples in rows.
+Match phenotype and covariate data to sample IDs explicitly before fitting any
+model. Adjust for relevant technical and biological covariates, and account for
+multiple testing across the regional components being tested. Regional PCA does
+not itself remove confounding or perform differential methylation testing.
+
+```{r sample-oriented-output}
+sample_scores <- t(res$regional_pcs)
+stopifnot(identical(rownames(sample_scores), colnames(mvals)))
+dim(sample_scores)
+```
+
+For prediction, PCA should be fitted within the training data. Held-out samples
+must use the training centering values and loadings. The package does not
+currently provide a separate projection function for new samples.
+
+# Session information
+
+```{r session-info}
 sessionInfo()
 ```
